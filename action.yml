@@ -1,0 +1,21 @@
+name: 'Terragrunt Import From Plan'
+description: 'Dynamically import resources from a terragrunt plan output if they are marked for creation.'
+author: 'Charles Sibbald'
+branding:
+  icon: 'download-cloud'
+  color: 'blue'
+
+inputs:
+  working-directory:
+    description: 'Path to the directory containing the terragrunt configuration.'
+    required: false
+    default: '.'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run dynamic import script
+      shell: bash
+      run: |
+        cd ${{ inputs.working-directory }}
+        bash ${{ github.action_path }}/entrypoint.sh
