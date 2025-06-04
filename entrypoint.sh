@@ -15,11 +15,7 @@ skipped=()
 already=()
 
 # Process each creatable resource
-jq -c '
-  .resource_changes[]
-  | select(.change.actions | inside(["create"]) or inside(["create", "update"]) or inside(["create", "delete", "update"]))
-  | {address: .address, after: .change.after}
-' plan.json | while read -r line; do
+while read -r line; do
   address=$(echo "$line" | jq -r '.address')
   after_obj=$(echo "$line" | jq '.after')
 
@@ -44,25 +40,29 @@ jq -c '
 
   echo "🔍 Checking $address..."
   if terragrunt state show "$address" > /dev/null 2>&1; then
-    echo "✅ $address already in state"
+    echo " ✅ $address already in state"
     already+=("$address")
   else
-    echo "📦 Importing $address with ID: $id"
+    echo " 📦 Importing $address with ID: $id"
     terragrunt import "$address" "$id"
     imported+=("$address")
   fi
 
-done
+done < <(jq -c '
+  .resource_changes[]
+  | select(.change.actions | inside(["create"]) or inside(["create", "update"]) or inside(["create", "delete", "update"]))
+  | {address: .address, after: .change.after}
+' plan.json)
 
 # Summary
-echo "\n✅ Import Summary"
+echo " ✅ Import Summary"
 echo "Imported:   ${#imported[@]}"
 echo "Already in state: ${#already[@]}"
 echo "Skipped:     ${#skipped[@]}"
 
 if [[ ${#imported[@]} -gt 0 ]]; then
-  printf "\n📦 Imported Resources:\n%s\n" "${imported[@]}"
+  printf " 📦 Imported Resources:\n%s\n" "${imported[@]}"
 fi
 if [[ ${#skipped[@]} -gt 0 ]]; then
-  printf "\n⚠️ Skipped (no ID):\n%s\n" "${skipped[@]}"
+  printf " ⚠️ Skipped (no ID):\n%s\n" "${skipped[@]}"
 fi

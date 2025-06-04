@@ -1,0 +1,24 @@
+name: Test Import Script
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  test-import-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Shell Test Env
+        run: sudo apt-get install -y jq
+
+      - name: Run entrypoint test
+        run: |
+          chmod +x entrypoint.sh
+          ./test/entrypoint_test.sh

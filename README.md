@@ -1,34 +1,29 @@
 # Terragrunt Import From Plan
 
-This GitHub Action dynamically imports resources detected as "to be created" in a `terragrunt plan` output into the Terraform state.
+[![Test](https://github.com/casibbald/terragrunt-import-from-plan/actions/workflows/test.yml/badge.svg)](https://github.com/casibbald/terragrunt-import-from-plan/actions/workflows/test.yml)
+[![Release](https://github.com/casibbald/terragrunt-import-from-plan/actions/workflows/release.yml/badge.svg)](https://github.com/casibbald/terragrunt-import-from-plan/actions/workflows/release.yml)
 
-It ensures that resources which already exist in the cloud but are not yet tracked by Terraform are brought into state automatically before apply.
+Automatically import Terraform resources from a Terragrunt plan.
 
----
-
-## 📦 Features
-
-- Runs `terragrunt plan -out=tf.plan`
-- Parses the JSON plan for any resources marked for `create`
-- For each resource:
-    - Runs `terragrunt state show`
-    - Runs `terragrunt import` only if the resource is not already in state
+This GitHub Action analyzes the output of `terragrunt plan`, identifies resources marked for creation, and attempts to import them into the Terraform state — skipping those already managed.
 
 ---
 
-## 🔧 Inputs
+## 🚀 Features
 
-| Name                | Description                                          | Default |
-|---------------------|------------------------------------------------------|---------|
-| `working-directory` | Path to the Terragrunt configuration to execute from | `.`     |
+- Parses `terraform show -json tf.plan`
+- Supports actions: `create`, `create+update`, and `replace`
+- Dynamically extracts IDs from fields like `name`, `id`, `repository_id`, `bucket`
+- Optional `PROJECT_ID` and `LOCATION` env vars to build GCP-style IDs
+- Prints a summary of imported, already-managed, and skipped resources
 
 ---
 
-## 🚀 Usage
+## 🛠 Usage
 
 ```yaml
 jobs:
-  terragrunt-import:
+  import-plan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,48 +31,50 @@ jobs:
       - name: Set up Terragrunt
         uses: metro-digital/cf-github-actions/terragrunt-setup@v1
 
-      - name: Run Terragrunt Import From Plan
-        uses: casibbald/terragrunt-import-from-plan@main
+      - name: Terragrunt Plan
+        run: terragrunt plan -out=tf.plan
+        working-directory: ./envs/dev/registry
+
+      - name: Import resources from plan
+        uses: casibbald/terragrunt-import-from-plan@v1
         with:
           working-directory: ./envs/dev/registry
 ```
 
----
+Optionally set `PROJECT_ID` and `LOCATION` as environment variables for GCP-style imports:
 
-## 📝 Requirements
-
-- `terragrunt` and `terraform` must be installed in the runner (use a setup action like `metro-digital/cf-github-actions/terragrunt-setup@v1`).
-- This action assumes `terragrunt plan -out=tf.plan` is valid in the target directory.
-
----
-
-## 🧪 Example Plan Result
-
-Given this in `plan.json`:
-```json
-{
-  "resource_changes": [
-    {
-      "address": "google_artifact_registry_repository.remote_repos[\"foo\"]",
-      "change": {
-        "actions": ["create"],
-        "after": {
-          "repository_id": "foo"
-        }
-      }
-    }
-  ]
-}
+```yaml
+env:
+  PROJECT_ID: cf-sam-ci-d0
+  LOCATION: europe-west1
 ```
-This action will run:
+
+---
+
+## 📄 Output Example
+
+```
+🔍 Checking google_artifact_registry_repository.remote_repos["mock-repo"]...
+📦 Importing google_artifact_registry_repository.remote_repos["mock-repo"] with ID: projects/cf-sam-ci-d0/locations/europe-west1/repositories/mock-repo
+
+✅ Import Summary
+Imported:   1
+Already in state: 0
+Skipped:     0
+
+📦 Imported Resources:
+google_artifact_registry_repository.remote_repos["mock-repo"]
+```
+
+---
+
+## 🧪 Run Tests
+
 ```bash
-terragrunt import google_artifact_registry_repository.remote_repos["foo"] projects/your-project/locations/your-region/repositories/foo
+./test/entrypoint_test.sh
 ```
 
----
-
-## 🤝 Contributing
-Pull requests and feedback welcome!
+This will run a mocked import against a fake `plan.json` and show the correct import logic.
 
 ---
 

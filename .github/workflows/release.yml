@@ -1,0 +1,64 @@
+name: Automated Release
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+  push:
+    tags:
+      - 'v*'
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set tag name
+        id: tag
+        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Read release notes
+        id: notes
+        run: |
+          NOTES_FILE=".github/release-notes/${{ env.TAG_NAME }}.md"
+          if [[ ! -f "$NOTES_FILE" ]]; then
+            echo "❌ No release notes found at $NOTES_FILE"
+            exit 1
+          fi
+          echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
+          cat "$NOTES_FILE" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Create GitHub release
+        id: gh_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Terragrunt Import from Plan ${{ env.TAG_NAME }}
+          body: ${{ env.RELEASE_BODY }}
+
+      - name: Bundle files
+        run: zip terragrunt-import-from-plan.zip entrypoint.sh action.yml README.md
+
+      - name: Upload bundled zip
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.gh_release.outputs.upload_url }}
+          asset_name: terragrunt-import-from-plan.zip
+          asset_content_type: application/zip
+          asset_path: ''
+
+      - name: Upload entrypoint script
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.gh_release.outputs.upload_url }}
+          asset_path: ./entrypoint.sh
+          asset_name: entrypoint.sh
+          asset_content_type: text/x-shellscript
