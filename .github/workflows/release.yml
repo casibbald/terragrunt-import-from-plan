@@ -2,15 +2,19 @@ name: Automated Release
 
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [ main ]
+    inputs:
+      tag_name:
+        description: 'Tag name for the release'
+        required: true
+        default: 'v0.0.0'
   push:
     tags:
       - 'v*'
-    branches: [ main ]
 
 permissions:
   contents: write
+  id-token: write
+  pull-requests: write
 
 jobs:
   release:
@@ -20,9 +24,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Shell Test Env
+        run: sudo apt-get install -y jq
+
+      - name: Run entrypoint test
+        run: |
+          chmod +x entrypoint.sh
+          ./test/entrypoint_test.sh
+
       - name: Set tag name
         id: tag
-        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "TAG_NAME=${{ github.event.inputs.tag_name }}" >> $GITHUB_ENV
+          else
+            echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          fi
 
       - name: Read release notes
         id: notes
@@ -36,29 +53,41 @@ jobs:
           cat "$NOTES_FILE" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - name: Create GitHub release
-        id: gh_release
+      - name: Create GitHub release and upload files
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.TAG_NAME }}
           name: Terragrunt Import from Plan ${{ env.TAG_NAME }}
           body: ${{ env.RELEASE_BODY }}
+          files: |
+            entrypoint.sh
+            action.yml
+            README.md
 
-      - name: Bundle files
-        run: zip terragrunt-import-from-plan.zip entrypoint.sh action.yml README.md
-
-      - name: Upload bundled zip
-        uses: actions/upload-release-asset@v1
+      - name: Create ZIP archive
+        uses: TheDoctor0/zip-release@0.7.1
         with:
-          upload_url: ${{ steps.gh_release.outputs.upload_url }}
-          asset_name: terragrunt-import-from-plan.zip
-          asset_content_type: application/zip
-          asset_path: ''
+          path: |
+            entrypoint.sh
+            action.yml
+            README.md
+          filename: terragrunt-import-from-plan.zip
 
-      - name: Upload entrypoint script
-        uses: actions/upload-release-asset@v1
+      - name: Upload build artifact
+        id: upload
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ steps.gh_release.outputs.upload_url }}
-          asset_path: ./entrypoint.sh
-          asset_name: entrypoint.sh
-          asset_content_type: text/x-shellscript
+          name: terragrunt-import-from-plan.zip
+          path: terragrunt-import-from-plan.zip
+
+#      - name: Generate local provenance attestation
+#        uses: actions/attest-build-provenance@v2
+#        with:
+#          subject-path: terragrunt-import-from-plan.zip
+#          show-summary: true
+#
+#      - name: Upload provenance file to release
+#        uses: softprops/action-gh-release@v1
+#        with:
+#          tag_name: ${{ env.TAG_NAME }}
+#          files: terragrunt-import-from-plan.intoto.jsonl

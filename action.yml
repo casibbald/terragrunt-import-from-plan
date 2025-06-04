@@ -4,6 +4,7 @@ author: 'Charles Sibbald'
 branding:
   icon: 'download-cloud'
   color: 'blue'
+keywords: terragrunt, terraform, import, automation, state, plan
 
 inputs:
   working-directory:
