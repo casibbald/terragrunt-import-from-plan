@@ -1,17 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
-# Ensure the plan exists
 PLAN_FILE=${1:-tf.plan}
 
-if [[ ! -f "$PLAN_FILE" ]]; then
-  echo "❌ Error: $PLAN_FILE not found. Run 'terragrunt plan -out=$PLAN_FILE' before this action."
-  exit 1
+# Use existing JSON plan file if provided
+if [[ "$PLAN_FILE" == *.json ]]; then
+  if [[ "$PLAN_FILE" != "plan.json" ]]; then
+    cp "$PLAN_FILE" plan.json
+  fi
+else
+  if [[ ! -f "$PLAN_FILE" ]]; then
+    echo "❌ Error: $PLAN_FILE not found. Run 'terragrunt plan -out=$PLAN_FILE' before this action."
+    exit 1
+  fi
+  # Export plan to JSON
+  terraform show -json "$PLAN_FILE" > plan.json
 fi
-
-# Export plan to JSON
-terraform show -json "$PLAN_FILE" > plan.json
-
 
 imported=()
 skipped=()
@@ -23,7 +27,9 @@ while read -r line; do
   after_obj=$(echo "$line" | jq '.after')
 
   id=$(echo "$after_obj" | jq -r '
-    if has("name") then .name
+    if has("arn") then .arn
+    elif has("id") and (.id | test("^/subscriptions/")) then .id
+    elif has("name") then .name
     elif has("repository_id") then .repository_id
     elif has("bucket") then .bucket
     elif has("id") then .id
@@ -37,7 +43,7 @@ while read -r line; do
   fi
 
   # Apply optional GCP prefix if provided
-  if [[ -n "${PROJECT_ID:-}" && -n "${LOCATION:-}" ]]; then
+  if [[ -n "${PROJECT_ID:-}" && -n "${LOCATION:-}" && "$id" != "arn:"* && "$id" != "/subscriptions/"* ]]; then
     id="projects/${PROJECT_ID}/locations/${LOCATION}/repositories/${id}"
   fi
 

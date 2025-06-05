@@ -1,9 +1,8 @@
 #!/bin/bash
-set -euo pipefail
+set -xeuo pipefail
 
 mkdir -p test/tmp && cd test/tmp
 
-# Create a valid plan.json directly
 cat > plan.json <<EOF
 {
   "resource_changes": [
@@ -28,13 +27,9 @@ terragrunt() {
   fi
   return 0
 }
-
 export -f terragrunt
 
-# Skip terraform show; pretend it's already parsed
-cp plan.json tf.plan
-
-# Patch entrypoint to use plan.json directly
-sed 's/terraform show -json tf.plan > plan.json/# using plan.json from test/' ../../entrypoint.sh | bash
+# Run entrypoint with JSON input
+bash ../../entrypoint.sh plan.json
 
 cd ../..
