@@ -1,0 +1,7 @@
+// variables.tf
+
+variable "project_id" {
+  type        = string
+  description = "GCP project ID"
+}
+
