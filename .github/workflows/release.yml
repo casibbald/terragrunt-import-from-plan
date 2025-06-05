@@ -1,0 +1,101 @@
+name: Automated Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release'
+        required: true
+        default: 'v0.0.0'
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.9.8
+
+      - name: Set up Shell Test Env
+        run: sudo apt-get install -y jq
+
+      - name: Setup terragrunt
+        uses: metro-digital/cf-github-actions/terragrunt-setup@v1
+
+      - name: Run entrypoint test
+        run: |
+          chmod +x entrypoint.sh
+          ./test/entrypoint_test.sh
+
+      - name: Set tag name
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "TAG_NAME=${{ github.event.inputs.tag_name }}" >> $GITHUB_ENV
+          else
+            echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          fi
+
+      - name: Read release notes
+        id: notes
+        run: |
+          NOTES_FILE=".github/release-notes/${{ env.TAG_NAME }}.md"
+          if [[ ! -f "$NOTES_FILE" ]]; then
+            echo "❌ No release notes found at $NOTES_FILE"
+            exit 1
+          fi
+          echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
+          cat "$NOTES_FILE" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Create GitHub release and upload files
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Terragrunt Import from Plan ${{ env.TAG_NAME }}
+          body: ${{ env.RELEASE_BODY }}
+          files: |
+            entrypoint.sh
+            action.yml
+            README.md
+
+      - name: Create ZIP archive
+        uses: TheDoctor0/zip-release@0.7.1
+        with:
+          path: |
+            entrypoint.sh
+            action.yml
+            README.md
+          filename: terragrunt-import-from-plan.zip
+
+      - name: Upload build artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: terragrunt-import-from-plan.zip
+          path: terragrunt-import-from-plan.zip
+
+#      - name: Generate local provenance attestation
+#        uses: actions/attest-build-provenance@v2
+#        with:
+#          subject-path: terragrunt-import-from-plan.zip
+#          show-summary: true
+#
+#      - name: Upload provenance file to release
+#        uses: softprops/action-gh-release@v1
+#        with:
+#          tag_name: ${{ env.TAG_NAME }}
+#          files: terragrunt-import-from-plan.intoto.jsonl

@@ -1,0 +1,27 @@
+name: 'Terragrunt Import From Plan'
+description: 'Dynamically import resources from a terragrunt plan output if they are marked for creation.'
+author: 'Charles Sibbald'
+branding:
+  icon: 'download-cloud'
+  color: 'blue'
+keywords: terragrunt, terraform, import, automation, state, plan
+
+inputs:
+  working-directory:
+    description: 'Path to the directory containing the terragrunt configuration.'
+    required: false
+    default: '.'
+  plan-file:
+    description: 'The filename of the Terraform plan to use.'
+    required: false
+    default: 'tf.plan'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run dynamic import script
+      shell: bash
+      run: |
+        cd ${{ inputs.working-directory }}
+        PLAN_FILE=${{ inputs.plan-file }}
+        bash ${{ github.action_path }}/entrypoint.sh "$PLAN_FILE"
