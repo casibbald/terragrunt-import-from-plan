@@ -29,7 +29,21 @@ terragrunt() {
 }
 export -f terragrunt
 
-# Run entrypoint with JSON input
-bash ../../entrypoint.sh plan.json
+# Run entrypoint with JSON input and capture output
+output=$(bash ../../entrypoint.sh plan.json 2>&1)
 
+echo "$output"
+
+# Assertions
+if ! grep -q "Imported:   1" <<< "$output"; then
+  echo "❌ Test failed: Expected 1 import."
+  exit 1
+fi
+
+if ! grep -q "MOCK: terragrunt import" <<< "$output"; then
+  echo "❌ Test failed: Import command was not triggered."
+  exit 1
+fi
+
+echo "✅ Test passed."
 cd ../..
