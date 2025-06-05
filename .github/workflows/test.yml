@@ -25,6 +25,17 @@ jobs:
       - name: Setup terragrunt
         uses: metro-digital/cf-github-actions/terragrunt-setup@v1
 
+      - name: Just install
+        uses: extractions/setup-just@v3
+        with:
+          github-token: ${{ secrets.MY_GITHUB_TOKEN }}
+
+      - name: Run just init
+        run: just init
+
+      - name: Run just plan
+        run: just plan
+
       - name: Run entrypoint test
         run: |
           chmod +x entrypoint.sh
