@@ -8,7 +8,7 @@ keywords: terragrunt, terraform, import, automation, state, plan
 
 inputs:
   working-directory:
-    description: 'Path to the directory containing the terragrunt configuration.'
+    description: 'Path to the dev containing the terragrunt configuration.'
     required: false
     default: '.'
   plan-file:
