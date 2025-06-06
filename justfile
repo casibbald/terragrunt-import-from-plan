@@ -11,12 +11,26 @@ default:
 
 # Initialize all modules
 init env=default_env:
-    cd {{terragrunt_dir}}/{{env}} && terragrunt run-all init
+    just clean
+    cd {{terragrunt_dir}}/{{env}} && terragrunt init --all
 
 # Plan all modules
 # Plan all modules
 plan env=default_env *VARS="":
-    cd {{terragrunt_dir}}/{{env}} && {{VARS}} terragrunt run-all plan -out ../../../test/tmp/plan.tf
+    # Do not give a .tf to the binary output, it will not work with Terragrunt
+    cd {{terragrunt_dir}}/{{env}} && {{VARS}} terragrunt run-all plan -out ../../../test/tmp/out.tfplan
+
+
+# Convert all .tfplan files to plan.json in-place under .terragrunt-cache
+plans-to-json env=default_env *VARS="":
+    cd {{terragrunt_dir}}/{{env}} && \
+    pwd && \
+    find ./test -type f -name 'out.tfplan' | while read plan; do \
+        echo "Converting $$plan to JSON..."; \
+        ls "$plan"; \
+        terraform show -json "$plan" > "${plan%.tfplan}.json"; \
+    done
+
 
 # Apply all modules
 apply env=default_env:
@@ -44,3 +58,4 @@ clean:
     find . -name ".terraform" -type d -exec rm -rf {} +
     find . -name ".terragrunt-cache" -type d -exec rm -rf {} +
     find . -name "*.tfstate" -type f -exec rm -f {} +
+    find . -name ".*.lock.hcl" -type f -exec rm -f {} +
