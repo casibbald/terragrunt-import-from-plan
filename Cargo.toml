@@ -1,0 +1,12 @@
+[package]
+name = "terragrunt_import_from_plan"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+regex = "1.10"
+anyhow = "1.0"
+clap = { version = "4.0", features = ["derive"] }
+

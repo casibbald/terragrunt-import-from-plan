@@ -9,6 +9,14 @@ terragrunt_dir := env_var_or_default("TERRAGRUNT_DIR", "envs/simulator/")
 default:
     @just --list
 
+
+gen:
+    just init
+    just plan
+    just plans-to-json
+    just copy-plan-json
+
+
 # Initialize all modules
 init env=default_env:
     just clean
@@ -16,20 +24,28 @@ init env=default_env:
 
 # Plan all modules
 # Plan all modules
+# Do not give a .tf to the binary output, it will not work with Terragrunt
 plan env=default_env *VARS="":
-    # Do not give a .tf to the binary output, it will not work with Terragrunt
-    cd {{terragrunt_dir}}/{{env}} && {{VARS}} terragrunt run-all plan -out ../../../test/tmp/out.tfplan
+    cd {{terragrunt_dir}}/{{env}} && {{VARS}} terragrunt run-all plan -out out.tfplan
 
 
 # Convert all .tfplan files to plan.json in-place under .terragrunt-cache
 plans-to-json env=default_env *VARS="":
-    cd {{terragrunt_dir}}/{{env}} && \
-    pwd && \
-    find ./test -type f -name 'out.tfplan' | while read plan; do \
-        echo "Converting $$plan to JSON..."; \
-        ls "$plan"; \
-        terraform show -json "$plan" > "${plan%.tfplan}.json"; \
+    cd envs/simulator/dev && \
+    find .terragrunt-cache -type f -name '*.tfplan' | while read plan; do \
+      echo "Converting $plan to JSON..."; \
+      terraform -chdir="$(dirname "$plan")" show -json "$(basename "$plan")" | jq '.' > "test/tmp/$(basename "$plan" .tfplan).json"; \
     done
+
+copy-plan-json env=default_env *VARS="":
+    cd envs/simulator/dev && \
+    find ./.terragrunt-cache -name "*.json" -type f -exec ls {} \; | while read plan; do \
+      echo "Copying $plan to test/tmp..."; \
+      cp "$plan" "../../../tests/fixtures/$(basename "$plan")"; \
+    done
+
+
+
 
 
 # Apply all modules
@@ -59,3 +75,5 @@ clean:
     find . -name ".terragrunt-cache" -type d -exec rm -rf {} +
     find . -name "*.tfstate" -type f -exec rm -f {} +
     find . -name ".*.lock.hcl" -type f -exec rm -f {} +
+    find . -name "out.tfplan" -type f -exec rm -f {} +
+    find envs/simulator/dev -name "plan.json" -type f -exec rm -f {} +
