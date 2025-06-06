@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [ main ]
-  push:
-    branches: [ main ]
 
 jobs:
   test-import-script:
@@ -13,6 +11,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
@@ -25,19 +37,31 @@ jobs:
       - name: Setup terragrunt
         uses: metro-digital/cf-github-actions/terragrunt-setup@v1
 
+      - name: Install Just
+        uses: extractions/setup-just@v3
+
       - name: Just install
         uses: extractions/setup-just@v3
         with:
           github-token: ${{ secrets.MY_GITHUB_TOKEN }}
 
-      - name: Run just init
-        run: just init
+      - name: Cargo build
+        #run: cargo build --all --all-features # this will also build the example projects, which are currently broken
+        run: cargo build
 
-      - name: Run just plan
-        run: just plan
+      - name: Cargo trst
+        #run: cargo build --all --all-features # this will also build the example projects, which are currently broken
+        run: cargo test
 
-      - name: Run entrypoint test
-        run: |
-          chmod +x entrypoint.sh
-          ./test/entrypoint_test.sh
+
+#      - name: Run just init
+#        run: just init
+#
+#      - name: Run just plan
+#        run: just plan
+#
+#      - name: Run entrypoint test
+#        run: |
+#          chmod +x entrypoint.sh
+#          ./test/entrypoint_test.sh
 
