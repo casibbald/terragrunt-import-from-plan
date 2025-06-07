@@ -31,6 +31,12 @@
   - [ ] Include verbose diagnostics to log which field was selected (if `--verbose` is set)
   - [ ] Write table-driven tests with various resource examples
   - [ ] Fail gracefully and provide helpful messages if no ID can be determined
+- [ ] **External Provider Schema Integration**
+  - [ ] Add CLI option `--schema-file` to accept path to full provider schema
+  - [ ] Load and deserialize JSON file into `HashMap<String, Value>`
+  - [ ] Use this as primary source for resource attribute scoring
+  - [ ] Fallback to embedded plan schemas or heuristic scoring if missing
+  - [ ] Update docs and error messages to recommend `terraform providers schema -json`
 - [ ] **Support `--filter-type=TYPE`** to import only specific resource types
 - [ ] **Support `--address=ADDRESS`** to import only a specific resource address
 - [ ] **Handle non-importable resources gracefully (e.g., data sources)**
@@ -61,15 +67,15 @@
 ```rust
 // Preferred when handling one case:
 if let Some(ref id) = inferred_id {
-    // use id
+// use id
 } else {
-    // handle absence
+// handle absence
 }
 
 // More verbose equivalent:
 match inferred_id {
-    Some(ref id) => { /* use id */ },
-    None => { /* handle absence */ },
+Some(ref id) => { /* use id */ },
+None => { /* handle absence */ },
 }
 ```
 

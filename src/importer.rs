@@ -1,10 +1,12 @@
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{self};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use serde_json::{Map, Value};
 use crate::plan::TerraformResource;
-use crate::utils::{collect_all_resources, collect_resources};
+use crate::utils::{collect_all_resources, collect_resources, extract_id_candidate_fields};
+
 
 #[derive(Debug, Deserialize)]
 pub struct PlanFile {
@@ -12,6 +14,17 @@ pub struct PlanFile {
     pub terraform_version: String,
     pub variables: Option<Variables>,
     pub planned_values: Option<PlannedValues>,
+    pub provider_schemas: Option<ProviderSchemas>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProviderSchema {
+    pub resource_schemas: Option<HashMap<String, serde_json::Value>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProviderSchemas {
+    pub provider_schemas: HashMap<String, ProviderSchema>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -136,8 +149,34 @@ pub fn generate_import_commands(
         let mut all_resources = vec![];
         collect_resources(&planned_values.root_module, &mut all_resources);
 
+        let schema_map = &plan.provider_schemas.as_ref().and_then(|ps| ps.provider_schemas.values().next())
+            .and_then(|provider| provider.resource_schemas.as_ref())
+            .cloned()
+            .unwrap_or_default();
+
         for resource in all_resources {
-            let inferred_id = infer_resource_id(&resource, verbose);
+            let terraform_resource = TerraformResource {
+                address: resource.address.clone(),
+                mode: resource.mode.clone(),
+                r#type: resource.r#type.clone(),
+                name: resource.name.clone(),
+                values: resource.values.clone(),
+            };
+
+            let schema_map = plan
+                .provider_schemas
+                .as_ref()
+                .and_then(|ps| ps.provider_schemas.values().next())
+                .and_then(|provider| provider.resource_schemas.as_ref())
+                .cloned()
+                .unwrap_or_default();
+
+            let inferred_id = infer_resource_id(
+                &terraform_resource,
+                schema_map.get(&terraform_resource.r#type),
+                verbose,
+            );
+
 
             if let Some(module_meta) = resource_map.get(&resource.address) {
                 if let Some(ref id) = inferred_id {
@@ -163,43 +202,64 @@ pub fn generate_import_commands(
 }
 
 
-pub fn infer_resource_id(resource: &&Resource, verbose: bool) -> Option<String> {
-    let values = resource.values.as_ref()?;
+/// Fallback when no provider schema is available.
+/// Scores likely identifier fields based on naming heuristics.
+pub fn extract_id_candidate_fields_from_values(values: &Map<String, Value>) -> HashSet<String> {
+    let mut fields = HashSet::new();
 
-    // Dynamically score based on common patterns and presence
-    let mut candidate_fields: Vec<(&String, &serde_json::Value)> = values
-        .as_object()?
+    for (key, val) in values.iter() {
+        if val.is_string() || val.is_number() || val.is_boolean() {
+            fields.insert(key.clone());
+        }
+    }
+
+    fields
+}
+
+pub fn infer_resource_id(
+    resource: &TerraformResource,
+    provider_schema_json: Option<&Value>,
+    verbose: bool,
+) -> Option<String> {
+    let values = resource.values.as_ref()?.as_object()?;
+    
+    
+    let candidates = if let Some(schema) = provider_schema_json {
+        extract_id_candidate_fields(schema)
+    } else {
+        // fallback for test cases without schemas
+        extract_id_candidate_fields_from_values(values)
+    };
+
+    // Always prioritize these if present
+    let priority_order = vec!["id", "name", "bucket", "self_link", "project"];
+    let mut ranked_candidates = priority_order
         .iter()
-        .filter_map(|(k, v)| {
-            if v.is_string() || v.is_number() || v.is_boolean() {
-                Some((k, v))
-            } else {
-                None
-            }
-        })
-        .collect();
+        .filter_map(|&field| values.get(field).map(|v| (field, v)))
+        .collect::<Vec<_>>();
 
-    candidate_fields.sort_by_key(|(k, _)| match k.as_str() {
-        "id" => 0,
-        "name" => 1,
-        "bucket" => 2,
-        "repository_id" => 3,
-        "dataset_id" => 4,
-        "instance" => 5,
-        "project" => 6,
-        "self_link" => 7,
-        _ => 100,
-    });
+    // Then add remaining fields from the schema
+    for (key, val) in values {
+        if candidates.contains(key) && !priority_order.contains(&key.as_str()) {
+            ranked_candidates.push((key, val));
+        }
+    }
 
     if verbose {
         println!(
-            "🔍 Resource {}: candidate ID fields ranked: {:?}",
+            "🔍 [{}] Ranked ID candidates: {:?}",
             resource.address,
-            candidate_fields.iter().map(|(k, _)| *k).collect::<Vec<_>>()
+            ranked_candidates.iter().map(|(k, _)| *k).collect::<Vec<_>>()
         );
     }
 
-    candidate_fields.first().map(|(_, v)| v.as_str().unwrap().to_string())
+    for (_, val) in ranked_candidates {
+        if let Some(s) = val.as_str() {
+            return Some(s.to_string());
+        }
+    }
+
+    None
 }
 
 pub fn execute_or_print_imports(
@@ -221,12 +281,45 @@ pub fn execute_or_print_imports(
         let mut skipped = 0;
         let mut failed = 0;
 
+        let provider_schemas = match &plan.provider_schemas {
+            Some(ps) => &ps.provider_schemas,
+            None => {
+                eprintln!("No provider_schemas found in plan");
+                return;
+            }
+        };
+        let schema_map = &plan.provider_schemas.as_ref().and_then(|ps| ps.provider_schemas.values().next())
+            .and_then(|provider| provider.resource_schemas.as_ref())
+            .cloned()
+            .unwrap_or_default();
+
         for resource in all_resources {
-            let inferred_id = infer_resource_id(&resource, verbose);
+            let terraform_resource = TerraformResource {
+                address: resource.address.clone(),
+                mode: resource.mode.clone(),
+                r#type: resource.r#type.clone(),
+                name: resource.name.clone(),
+                values: resource.values.clone(),
+            };
+
+            let schema_map = plan
+                .provider_schemas
+                .as_ref()
+                .and_then(|ps| ps.provider_schemas.values().next())
+                .and_then(|provider| provider.resource_schemas.as_ref())
+                .cloned()
+                .unwrap_or_default();
+
+            let inferred_id = infer_resource_id(
+                &terraform_resource,
+                schema_map.get(&terraform_resource.r#type),
+                verbose,
+            );
+
 
             match resource_map.get(&resource.address) {
                 Some(module_meta) => {
-                    if let Some(ref id) = inferred_id {
+                    if let Some(id) = inferred_id {
                         let module_path = PathBuf::from(module_root).join(&module_meta.dir);
                         if dry_run {
                             println!(
@@ -281,7 +374,7 @@ pub fn execute_or_print_imports(
 pub fn run_terragrunt_import(
     module_path: &Path,
     resource_address: &str,
-    resource_id: &str,
+    resource_id: String,
 ) -> io::Result<()> {
     if !module_path.exists() {
         return Err(io::Error::new(
@@ -310,12 +403,42 @@ pub fn run_terragrunt_import(
 }
 
 
+fn check(
+    module: &PlannedModule,
+    found: &mut bool,
+    verbose: bool,
+    schema_map: &HashMap<String, serde_json::Value>,
+) {
+    if let Some(resources) = &module.resources {
+        for resource in resources {
+            let terraform_resource = TerraformResource {
+                address: resource.address.clone(),
+                mode: resource.mode.clone(),
+                r#type: resource.r#type.clone(),
+                name: resource.name.clone(),
+                values: resource.values.clone(),
+            };
 
+            if let Some(id) = infer_resource_id(&terraform_resource, schema_map.get(&terraform_resource.r#type), verbose) {
+                println!("Inferred ID for {}: {}", terraform_resource.address, id);
+                *found = true;
+                return;
+            }
+        }
+    }
+
+    if let Some(children) = &module.child_modules {
+        for child in children {
+            check(child, found, verbose, schema_map);
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
+    use std::hash::Hash;
 
     #[test]
     fn test_validate_module_dirs() {
@@ -365,10 +488,26 @@ mod tests {
 
         let mut found = false;
         if let Some(planned_values) = &plan.planned_values {
-            fn check(module: &PlannedModule, found: &mut bool, verbose: bool) {
+            let check = |module: &PlannedModule, found: &mut bool, verbose: bool| {
                 if let Some(resources) = &module.resources {
                     for resource in resources {
-                        if let Some(id) = infer_resource_id(&resource, verbose) {
+                        let terraform_resource = TerraformResource {
+                            address: resource.address.clone(),
+                            mode: resource.mode.clone(),
+                            r#type: resource.r#type.clone(),
+                            name: resource.name.clone(),
+                            values: resource.values.clone(),
+                        };
+
+                        let schema_map = plan
+                            .provider_schemas
+                            .as_ref()
+                            .and_then(|ps| ps.provider_schemas.values().next())
+                            .and_then(|provider| provider.resource_schemas.as_ref())
+                            .cloned()
+                            .unwrap_or_default();
+
+                        if let Some(id) = infer_resource_id(&terraform_resource, schema_map.get(&terraform_resource.r#type), verbose) {
                             println!("Inferred ID for {}: {}", resource.address, id);
                             *found = true;
                             return;
@@ -376,16 +515,28 @@ mod tests {
                     }
                 }
                 if let Some(children) = &module.child_modules {
+
+                    let schema_map = plan
+                        .provider_schemas
+                        .as_ref()
+                        .and_then(|ps| ps.provider_schemas.values().next())
+                        .and_then(|provider| provider.resource_schemas.as_ref())
+                        .cloned()
+                        .unwrap_or_default();
                     for child in children {
-                        check(child, found, verbose);
+                        check(child, found, verbose, &schema_map);
                     }
                 }
-            }
+            };
             check(&planned_values.root_module, &mut found, verbose);
         }
 
         assert!(found, "No resource ID could be inferred");
     }
+
+    
+    
+
 
     #[test]
     fn test_run_terragrunt_import_mock() {

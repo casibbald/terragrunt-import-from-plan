@@ -1,3 +1,5 @@
+#![feature(let_chains)]
+
 mod errors;
 mod importer;
 mod plan;
@@ -7,6 +9,8 @@ use crate::importer::{map_resources_to_modules, generate_import_commands, Module
 use clap::Parser;
 use std::fs;
 use std::path::Path;
+use std::process::id;
+use crate::plan::TerraformResource;
 use crate::utils::collect_resources;
 
 #[derive(Parser, Debug)]
@@ -64,12 +68,33 @@ fn main() {
             collect_resources(&planned_values.root_module, &mut all_resources);
 
             for resource in all_resources {
-                let inferred_id = infer_resource_id(&resource, args.verbose);
+                let terraform_resource = TerraformResource {
+                    address: resource.address.clone(),
+                    mode: resource.mode.clone(),
+                    r#type: resource.r#type.clone(),
+                    name: resource.name.clone(),
+                    values: resource.values.clone(),
+                };
+
+                let schema_map = plan_file
+                    .provider_schemas
+                    .as_ref()
+                    .and_then(|ps| ps.provider_schemas.values().next())
+                    .and_then(|provider| provider.resource_schemas.as_ref())
+                    .cloned()
+                    .unwrap_or_default();
+
+                let inferred_id = infer_resource_id(
+                    &terraform_resource,
+                    schema_map.get(&terraform_resource.r#type),
+                    args.verbose,
+                );
+
 
                 if let Some(id) = inferred_id {
                     if let Some(module_meta) = mapping.get(&resource.address) {
                         let module_path = Path::new(&module_meta.dir);
-                        match run_terragrunt_import(module_path, &resource.address, &id) {
+                        match run_terragrunt_import(module_path, &resource.address, id) {
                             Ok(_) => println!("✅ Imported {}", resource.address),
                             Err(e) => eprintln!("❌ Error importing {}: {}", resource.address, e),
                         }
