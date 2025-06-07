@@ -129,7 +129,7 @@ pub fn generate_import_commands(
         .iter()
         .map(|(resource_address, module_meta)| {
             format!(
-                "terraform import -config-dir={} {} <RESOURCE_ID>",
+                "terragrunt import -config-dir={} {} <RESOURCE_ID>",
                 module_meta.dir, resource_address
             )
         })
@@ -302,7 +302,7 @@ mod tests {
 
         assert!(!commands.is_empty(), "No import commands generated");
         for cmd in commands {
-            assert!(cmd.starts_with("terraform import"), "Command does not start with terraform import: {}", cmd);
+            assert!(cmd.starts_with("terragrunt import"), "Command does not start with terraform import: {}", cmd);
         }
     }
 
@@ -336,24 +336,24 @@ mod tests {
     }
 
     #[test]
-    fn test_run_terraform_import_mock() {
+    fn test_run_terragrunt_import_mock() {
         // This test validates the command construction without executing terraform.
         let module_dir = "mock_dir";
         let resource_address = "mock_resource_address";
         let resource_id = "mock_resource_id";
 
         let cmd = Command::new("echo")
-            .arg("terraform")
+            .arg("terragrunt")
             .arg("import")
             .arg("-config-dir")
             .arg(module_dir)
             .arg(resource_address)
             .arg(resource_id)
             .output()
-            .expect("Failed to simulate terraform command");
+            .expect("Failed to simulate terragrunt command");
 
         let output = String::from_utf8_lossy(&cmd.stdout);
-        assert!(output.contains("terraform"));
+        assert!(output.contains("terragrunt"));
         assert!(output.contains(module_dir));
         assert!(output.contains(resource_address));
         assert!(output.contains(resource_id));
