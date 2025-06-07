@@ -54,8 +54,8 @@ jobs:
         run: cargo test
 
 
-#      - name: Run just init
-#        run: just init
+      - name: Dry dry
+        run: cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/modules --dry-run
 #
 #      - name: Run just plan
 #        run: just plan
