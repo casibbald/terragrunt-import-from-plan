@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::io::{self};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use crate::plan::TerraformResource;
+use crate::utils::{collect_all_resources, collect_resources};
 
 #[derive(Debug, Deserialize)]
 pub struct PlanFile {
@@ -124,47 +126,93 @@ pub fn map_resources_to_modules<'a>(
 
 pub fn generate_import_commands(
     resource_map: &HashMap<String, &ModuleMeta>,
+    plan: &PlanFile,
+    module_root: &str,
+    verbose: bool,
 ) -> Vec<String> {
-    resource_map
-        .iter()
-        .map(|(resource_address, module_meta)| {
-            format!(
-                "terragrunt import -config-dir={} {} <RESOURCE_ID>",
-                module_meta.dir, resource_address
-            )
-        })
-        .collect()
-}
+    let mut commands = vec![];
 
-pub fn infer_resource_id(resource: &Resource) -> Option<String> {
-    if let Some(values) = &resource.values {
-        if let Some(id_val) = values.get("name") {
-            return Some(id_val.to_string().replace('"', ""));
-        }
-        if let Some(id_val) = values.get("id") {
-            return Some(id_val.to_string().replace('"', ""));
+    if let Some(planned_values) = &plan.planned_values {
+        let mut all_resources = vec![];
+        collect_resources(&planned_values.root_module, &mut all_resources);
+
+        for resource in all_resources {
+            let inferred_id = infer_resource_id(&resource, verbose);
+
+            if let Some(module_meta) = resource_map.get(&resource.address) {
+                if let Some(ref id) = inferred_id {
+                    let full_path = PathBuf::from(module_root).join(&module_meta.dir);
+                    let cmd = format!(
+                        "terragrunt import -config-dir={} {} {}",
+                        full_path.display(),
+                        resource.address,
+                        id
+                    );
+                    commands.push(cmd);
+                } else if verbose {
+                    println!(
+                        "⚠️ Could not infer ID for resource {}",
+                        resource.address
+                    );
+                }
+            }
         }
     }
-    None
+
+    commands
+}
+
+
+pub fn infer_resource_id(resource: &&Resource, verbose: bool) -> Option<String> {
+    let values = resource.values.as_ref()?;
+
+    // Dynamically score based on common patterns and presence
+    let mut candidate_fields: Vec<(&String, &serde_json::Value)> = values
+        .as_object()?
+        .iter()
+        .filter_map(|(k, v)| {
+            if v.is_string() || v.is_number() || v.is_boolean() {
+                Some((k, v))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    candidate_fields.sort_by_key(|(k, _)| match k.as_str() {
+        "id" => 0,
+        "name" => 1,
+        "bucket" => 2,
+        "repository_id" => 3,
+        "dataset_id" => 4,
+        "instance" => 5,
+        "project" => 6,
+        "self_link" => 7,
+        _ => 100,
+    });
+
+    if verbose {
+        println!(
+            "🔍 Resource {}: candidate ID fields ranked: {:?}",
+            resource.address,
+            candidate_fields.iter().map(|(k, _)| *k).collect::<Vec<_>>()
+        );
+    }
+
+    candidate_fields.first().map(|(_, v)| v.as_str().unwrap().to_string())
 }
 
 pub fn execute_or_print_imports(
     resource_map: &HashMap<String, &ModuleMeta>,
     plan: &PlanFile,
     dry_run: bool,
+    verbose: bool,
     module_root: &str,
 ) {
     if let Some(planned_values) = &plan.planned_values {
-        fn collect_resources<'a>(module: &'a PlannedModule, resources: &mut Vec<&'a Resource>) {
-            if let Some(rs) = &module.resources {
-                resources.extend(rs.iter());
-            }
-            if let Some(children) = &module.child_modules {
-                for child in children {
-                    collect_resources(child, resources);
-                }
-            }
-        }
+        
+        let mut all_resources = vec![];
+        collect_all_resources(&planned_values.root_module, &mut all_resources);
 
         let mut all_resources = vec![];
         collect_resources(&planned_values.root_module, &mut all_resources);
@@ -174,38 +222,39 @@ pub fn execute_or_print_imports(
         let mut failed = 0;
 
         for resource in all_resources {
-            let resource_id = infer_resource_id(resource);
+            let inferred_id = infer_resource_id(&resource, verbose);
+
             match resource_map.get(&resource.address) {
                 Some(module_meta) => {
-                    match resource_id {
-                        Some(ref id) => {
-                            let module_path = PathBuf::from(module_root).join(&module_meta.dir);
-                            if dry_run {
-                                println!(
-                                    "🌿 [DRY RUN] terragrunt import -config-dir={} {} {}",
-                                    module_path.display(), resource.address, id
-                                );
-                                imported += 1;
-                            } else {
-                                match run_terragrunt_import(&module_path, &resource.address, id) {
-                                    Ok(_) => {
-                                        println!("✅ Imported {}", resource.address);
-                                        imported += 1;
-                                    }
-                                    Err(_) => {
-                                        eprintln!("❌ Error importing {}: Module path does not exist: {}", resource.address, module_path.display());
-                                        failed += 1;
-                                    }
+                    if let Some(ref id) = inferred_id {
+                        let module_path = PathBuf::from(module_root).join(&module_meta.dir);
+                        if dry_run {
+                            println!(
+                                "🌿 [DRY RUN] terragrunt import -config-dir={} {} {}",
+                                module_path.display(),
+                                resource.address,
+                                id
+                            );
+                            imported += 1;
+                        } else {
+                            match run_terragrunt_import(&module_path, &resource.address, id) {
+                                Ok(_) => {
+                                    println!("✅ Imported {}", resource.address);
+                                    imported += 1;
+                                }
+                                Err(_) => {
+                                    eprintln!(
+                                        "❌ Error importing {}: Module path does not exist: {}",
+                                        resource.address,
+                                        module_path.display()
+                                    );
+                                    failed += 1;
                                 }
                             }
                         }
-                        None => {
-                            println!(
-                                "⚠️ Skipped {}: no ID could be inferred",
-                                resource.address
-                            );
-                            skipped += 1;
-                        }
+                    } else {
+                        println!("⚠️ Skipped {}: no ID could be inferred", resource.address);
+                        skipped += 1;
                     }
                 }
                 None => {
@@ -224,6 +273,8 @@ pub fn execute_or_print_imports(
         );
     }
 }
+
+
 
 
 
@@ -298,7 +349,7 @@ mod tests {
         let plan: PlanFile = serde_json::from_str(&plan_data).expect("Invalid plan JSON");
 
         let mapping = map_resources_to_modules(&modules_file.modules, &plan);
-        let commands = generate_import_commands(&mapping);
+        let commands = generate_import_commands(&mapping, &plan, ".", true);
 
         assert!(!commands.is_empty(), "No import commands generated");
         for cmd in commands {
@@ -310,13 +361,14 @@ mod tests {
     fn test_infer_resource_id() {
         let plan_data = fs::read_to_string("tests/fixtures/out.json").expect("Unable to read plan file");
         let plan: PlanFile = serde_json::from_str(&plan_data).expect("Invalid plan JSON");
+        let verbose = true;
 
         let mut found = false;
         if let Some(planned_values) = &plan.planned_values {
-            fn check(module: &PlannedModule, found: &mut bool) {
+            fn check(module: &PlannedModule, found: &mut bool, verbose: bool) {
                 if let Some(resources) = &module.resources {
                     for resource in resources {
-                        if let Some(id) = infer_resource_id(resource) {
+                        if let Some(id) = infer_resource_id(&resource, verbose) {
                             println!("Inferred ID for {}: {}", resource.address, id);
                             *found = true;
                             return;
@@ -325,11 +377,11 @@ mod tests {
                 }
                 if let Some(children) = &module.child_modules {
                     for child in children {
-                        check(child, found);
+                        check(child, found, verbose);
                     }
                 }
             }
-            check(&planned_values.root_module, &mut found);
+            check(&planned_values.root_module, &mut found, verbose);
         }
 
         assert!(found, "No resource ID could be inferred");
