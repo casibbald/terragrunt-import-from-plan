@@ -3,7 +3,7 @@ mod importer;
 mod plan;
 mod utils;
 
-use crate::importer::{map_resources_to_modules, generate_import_commands, ModulesFile, PlanFile};
+use crate::importer::{map_resources_to_modules, generate_import_commands, ModulesFile, PlanFile, infer_resource_id, Resource, PlannedModule, run_terragrunt_import};
 use clap::Parser;
 use std::fs;
 use std::path::Path;
@@ -40,13 +40,46 @@ fn main() {
     let plan_file = load_plan(&args.plan).expect("Failed to load plan");
 
     let mapping = map_resources_to_modules(&modules_file.modules, &plan_file);
-    let commands = generate_import_commands(&mapping);
 
     if args.dry_run {
+        let commands = generate_import_commands(&mapping);
         for cmd in commands {
             println!("{}", cmd);
         }
     } else {
-        println!("Non-dry-run execution not yet implemented");
+        for (resource_address, module_meta) in &mapping {
+            // Look up full Resource object from plan to infer ID
+            let mut inferred_id = None;
+            if let Some(planned_values) = &plan_file.planned_values {
+                fn search<'a>(module: &'a PlannedModule, addr: &str) -> Option<&'a Resource> {
+                    if let Some(resources) = &module.resources {
+                        if let Some(found) = resources.iter().find(|r| r.address == addr) {
+                            return Some(found);
+                        }
+                    }
+                    if let Some(children) = &module.child_modules {
+                        for child in children {
+                            if let Some(found) = search(child, addr) {
+                                return Some(found);
+                            }
+                        }
+                    }
+                    None
+                }
+                if let Some(resource) = search(&planned_values.root_module, resource_address) {
+                    inferred_id = infer_resource_id(resource);
+                }
+            }
+
+            if let Some(id) = inferred_id {
+                match run_terragrunt_import(&module_meta.dir, resource_address, &id) {
+                    Ok(_) => println!("✅ Imported {}", resource_address),
+                    Err(e) => eprintln!("❌ Error importing {}: {}", resource_address, e),
+                }
+            } else {
+                eprintln!("⚠️ Skipped {}: no ID could be inferred", resource_address);
+            }
+        }
     }
 }
+
