@@ -1,9 +1,8 @@
 use serde::Deserialize;
-use std::fs;
-use std::path::Path;
 use std::collections::HashMap;
+use std::io::{self};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::io::{self, Write};
 
 #[derive(Debug, Deserialize)]
 pub struct PlanFile {
@@ -66,7 +65,12 @@ pub struct ModulesFile {
     pub(crate) modules: Vec<ModuleMeta>,
 }
 
-pub fn validate_module_dirs<P: AsRef<Path>>(modules: &[ModuleMeta], base_path: P) -> Vec<String> {
+
+
+pub fn validate_module_dirs<P: AsRef<Path>>(
+    modules: &[ModuleMeta],
+    base_path: P,
+) -> Vec<String> {
     modules
         .iter()
         .filter_map(|module| {
@@ -80,11 +84,18 @@ pub fn validate_module_dirs<P: AsRef<Path>>(modules: &[ModuleMeta], base_path: P
         .collect()
 }
 
-pub fn map_resources_to_modules<'a>(modules: &'a [ModuleMeta], plan: &'a PlanFile) -> HashMap<String, &'a ModuleMeta> {
+pub fn map_resources_to_modules<'a>(
+    modules: &'a [ModuleMeta],
+    plan: &'a PlanFile,
+) -> HashMap<String, &'a ModuleMeta> {
     let mut mapping = HashMap::new();
 
     if let Some(planned_values) = &plan.planned_values {
-        fn recurse_modules<'a>(modules: &'a [ModuleMeta], module: &'a PlannedModule, mapping: &mut HashMap<String, &'a ModuleMeta>) {
+        fn recurse_modules<'a>(
+            modules: &'a [ModuleMeta],
+            module: &'a PlannedModule,
+            mapping: &mut HashMap<String, &'a ModuleMeta>,
+        ) {
             if let Some(resources) = &module.resources {
                 if let Some(address) = &module.address {
                     let prefix = address.strip_prefix("module.").unwrap_or("");
@@ -110,14 +121,18 @@ pub fn map_resources_to_modules<'a>(modules: &'a [ModuleMeta], plan: &'a PlanFil
     mapping
 }
 
-pub fn generate_import_commands(resource_map: &HashMap<String, &ModuleMeta>) -> Vec<String> {
-    resource_map.iter().map(|(resource_address, module_meta)| {
-        format!(
-            "terraform import -config-dir={} {} <RESOURCE_ID>",
-            module_meta.dir,
-            resource_address
-        )
-    }).collect()
+pub fn generate_import_commands(
+    resource_map: &HashMap<String, &ModuleMeta>,
+) -> Vec<String> {
+    resource_map
+        .iter()
+        .map(|(resource_address, module_meta)| {
+            format!(
+                "terraform import -config-dir={} {} <RESOURCE_ID>",
+                module_meta.dir, resource_address
+            )
+        })
+        .collect()
 }
 
 pub fn infer_resource_id(resource: &Resource) -> Option<String> {
@@ -132,13 +147,100 @@ pub fn infer_resource_id(resource: &Resource) -> Option<String> {
     None
 }
 
-pub fn run_terraform_import(module_dir: &str, resource_address: &str, resource_id: &str) -> io::Result<()> {
-    let status = Command::new("terraform")
+pub fn execute_or_print_imports(
+    resource_map: &HashMap<String, &ModuleMeta>,
+    plan: &PlanFile,
+    dry_run: bool,
+) {
+    if let Some(planned_values) = &plan.planned_values {
+        fn collect_resources<'a>(module: &'a PlannedModule, resources: &mut Vec<&'a Resource>) {
+            if let Some(rs) = &module.resources {
+                resources.extend(rs.iter());
+            }
+            if let Some(children) = &module.child_modules {
+                for child in children {
+                    collect_resources(child, resources);
+                }
+            }
+        }
+
+        let mut all_resources = vec![];
+        collect_resources(&planned_values.root_module, &mut all_resources);
+
+        let mut imported = 0;
+        let mut skipped = 0;
+        let mut failed = 0;
+
+        for resource in all_resources {
+            let resource_id = infer_resource_id(resource);
+            match resource_map.get(&resource.address) {
+                Some(module_meta) => {
+                    match resource_id {
+                        Some(ref id) => {
+                            if dry_run {
+                                println!(
+                                    "🌿 [DRY RUN] terragrunt import -config-dir={} {} {}",
+                                    module_meta.dir, resource.address, id
+                                );
+                                imported += 1;
+                            } else {
+                                match run_terragrunt_import(&module_meta.dir, &resource.address, id) {
+                                    Ok(_) => {
+                                        println!("✅ Imported {}", resource.address);
+                                        imported += 1;
+                                    }
+                                    Err(_) => {
+                                        eprintln!("❌ Error importing {}", resource.address);
+                                        failed += 1;
+                                    }
+                                }
+                            }
+                        }
+                        None => {
+                            println!(
+                                "⚠️ Skipped {}: no ID could be inferred",
+                                resource.address
+                            );
+                            skipped += 1;
+                        }
+                    }
+                }
+                None => {
+                    println!(
+                        "⚠️ Skipped {}: no matching module mapping found",
+                        resource.address
+                    );
+                    skipped += 1;
+                }
+            }
+        }
+
+        println!(
+            "\n📦 Import Summary\nImported:   {}\nAlready in state: 0\nSkipped:     {}\nFailed:      {}",
+            imported, skipped, failed
+        );
+    }
+}
+
+
+pub fn run_terragrunt_import(
+    module_dir: &str,
+    resource_address: &str,
+    resource_id: &str,
+) -> io::Result<()> {
+    let full_path = PathBuf::from(module_dir);
+    if !full_path.exists() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("Module path does not exist: {}", module_dir),
+        ));
+    }
+
+    let status = Command::new("terragrunt")
         .arg("import")
-        .arg("-config-dir")
-        .arg(module_dir)
         .arg(resource_address)
         .arg(resource_id)
+        .current_dir(full_path)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()?;
@@ -146,9 +248,14 @@ pub fn run_terraform_import(module_dir: &str, resource_address: &str, resource_i
     if status.success() {
         Ok(())
     } else {
-        Err(io::Error::new(io::ErrorKind::Other, format!("Failed to import {}", resource_address)))
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("Failed to import {}", resource_address),
+        ))
     }
 }
+
+
 
 #[cfg(test)]
 mod tests {

@@ -49,7 +49,7 @@ jobs:
         #run: cargo build --all --all-features # this will also build the example projects, which are currently broken
         run: cargo build
 
-      - name: Cargo trst
+      - name: Cargo test
         #run: cargo build --all --all-features # this will also build the example projects, which are currently broken
         run: cargo test
 
