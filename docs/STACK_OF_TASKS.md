@@ -7,40 +7,32 @@
 - [x] Rust parsing logic for `out.json` and `modules.json`
 - [x] Mapping of Terraform resources to module directories
 - [x] Inference of Terraform resource IDs
-
----
-
-### 🔄 **In Progress: Execution logic to run `terraform import` with dry-run toggle**
-- [ ] CLI Argument Handling for `--dry-run`
-- [ ] Iteration Over Inferred Resources for Execution
-- [ ] Conditional Branching: Print vs Execute Command
-- [ ] Command Construction and Path Handling
-- [ ] Error Handling and Logging for Execution Failures
-- [ ] Ensure Base Path (e.g., `simulator/`) Prefixes `config-dir`
-- [ ] Display Executed Commands for Transparency in Dry-Run
+- [x] Execution logic to run `terragrunt import` with dry-run toggle
 
 ---
 
 ### 🛠️ **Remaining Tasks**
 
 #### 🧩 Functionality Enhancements
-- [ ] **Support filter by resource type** via `--filter-type`
-- [ ] **Support specific resource address** imports (e.g., `--address module.foo.google_x.bar`)
-- [ ] **Enhanced ID inference**: use more sophisticated heuristics when `name` and `id` are not sufficient
-- [ ] **Handle non-importable resources gracefully**
+- [ ] **Correct use of Terragrunt**: various steps call 'terraform' when it should be 'terragrunt'
+- [ ] **Enhanced ID inference**: Use additional fields like `bucket`, `self_link`, etc.
+- [ ] **Support `--filter-type=TYPE`** to import only specific resource types
+- [ ] **Support `--address=ADDRESS`** to import only a specific resource address
+- [ ] **Handle non-importable resources gracefully (e.g., data sources)**
 
 #### 📦 CLI & Config Polish
-- [ ] **Ensure `--verbose` prints diagnostics**
+- [ ] **Respect and validate `--module-root` directory structure**
+- [ ] **Ensure `--verbose` prints detailed diagnostics**
 - [ ] **Add support for configurable `--config-dir` path base**
-- [ ] **Default paths work cleanly from GitHub Action (not just local)**
+- [ ] **Ensure default paths function correctly within GitHub Actions**
 
 #### 🧪 Testing & Validation
-- [ ] **Unit tests for all major functionality**
-- [ ] **Integration test**: Generate real `tf.plan` via Terragrunt and validate import end-to-end
-- [ ] **Mocked `terraform import` testing** for test mode without GCP credentials
-- [ ] **CI GitHub Action test** with dry-run verification
+- [ ] **Unit tests** for all major functions (`infer_resource_id`, `run_terragrunt_import`, etc.)
+- [ ] **Integration test**: Generate real `tf.plan` via Terragrunt and validate imports
+- [ ] **Mocked import testing** to simulate imports without actual GCP
+- [ ] **CI GitHub Action test** validating dry-run output
 
 #### 🚀 GitHub Action Integration
-- [ ] **Build and compile the Rust binary** within the GitHub Action
-- [ ] **Run with simulated plan + modules JSON**
-- [ ] **Emit structured output for GitHub summary log**
+- [ ] **Compile Rust binary within GitHub Action**
+- [ ] **Run binary with simulated plan + module input**
+- [ ] **Emit structured import summary in GitHub job output**
