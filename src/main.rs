@@ -17,9 +17,13 @@ struct Args {
     #[arg(short, long, default_value = "tests/fixtures/modules.json")]
     modules: String,
 
+    #[arg(long, default_value = "simulator/modules")]
+    module_root: String,
+
     #[arg(long, default_value_t = false)]
     dry_run: bool,
 }
+
 
 fn load_modules<P: AsRef<Path>>(path: P) -> Result<ModulesFile, Box<dyn std::error::Error>> {
     let content = fs::read_to_string(path)?;
@@ -72,7 +76,7 @@ fn main() {
             }
 
             if let Some(id) = inferred_id {
-                match run_terragrunt_import(&module_meta.dir, resource_address, &id) {
+                match run_terragrunt_import((&module_meta.dir).as_ref(), resource_address, &id) {
                     Ok(_) => println!("✅ Imported {}", resource_address),
                     Err(e) => eprintln!("❌ Error importing {}: {}", resource_address, e),
                 }

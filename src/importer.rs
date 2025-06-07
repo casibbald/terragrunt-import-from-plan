@@ -69,12 +69,12 @@ pub struct ModulesFile {
 
 pub fn validate_module_dirs<P: AsRef<Path>>(
     modules: &[ModuleMeta],
-    base_path: P,
+    module_root: P,
 ) -> Vec<String> {
     modules
         .iter()
         .filter_map(|module| {
-            let path = base_path.as_ref().join(&module.dir);
+            let path = module_root.as_ref().join(&module.dir);
             if !path.is_dir() {
                 Some(format!("Missing or invalid directory: {}", path.display()))
             } else {
@@ -83,6 +83,7 @@ pub fn validate_module_dirs<P: AsRef<Path>>(
         })
         .collect()
 }
+
 
 pub fn map_resources_to_modules<'a>(
     modules: &'a [ModuleMeta],
@@ -151,6 +152,7 @@ pub fn execute_or_print_imports(
     resource_map: &HashMap<String, &ModuleMeta>,
     plan: &PlanFile,
     dry_run: bool,
+    module_root: &str,
 ) {
     if let Some(planned_values) = &plan.planned_values {
         fn collect_resources<'a>(module: &'a PlannedModule, resources: &mut Vec<&'a Resource>) {
@@ -177,20 +179,21 @@ pub fn execute_or_print_imports(
                 Some(module_meta) => {
                     match resource_id {
                         Some(ref id) => {
+                            let module_path = PathBuf::from(module_root).join(&module_meta.dir);
                             if dry_run {
                                 println!(
                                     "🌿 [DRY RUN] terragrunt import -config-dir={} {} {}",
-                                    module_meta.dir, resource.address, id
+                                    module_path.display(), resource.address, id
                                 );
                                 imported += 1;
                             } else {
-                                match run_terragrunt_import(&module_meta.dir, &resource.address, id) {
+                                match run_terragrunt_import(&module_path, &resource.address, id) {
                                     Ok(_) => {
                                         println!("✅ Imported {}", resource.address);
                                         imported += 1;
                                     }
                                     Err(_) => {
-                                        eprintln!("❌ Error importing {}", resource.address);
+                                        eprintln!("❌ Error importing {}: Module path does not exist: {}", resource.address, module_path.display());
                                         failed += 1;
                                     }
                                 }
@@ -223,16 +226,16 @@ pub fn execute_or_print_imports(
 }
 
 
+
 pub fn run_terragrunt_import(
-    module_dir: &str,
+    module_path: &Path,
     resource_address: &str,
     resource_id: &str,
 ) -> io::Result<()> {
-    let full_path = PathBuf::from(module_dir);
-    if !full_path.exists() {
+    if !module_path.exists() {
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
-            format!("Module path does not exist: {}", module_dir),
+            format!("Module path does not exist: {}", module_path.display()),
         ));
     }
 
@@ -240,7 +243,7 @@ pub fn run_terragrunt_import(
         .arg("import")
         .arg(resource_address)
         .arg(resource_id)
-        .current_dir(full_path)
+        .current_dir(module_path)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()?;
@@ -254,6 +257,7 @@ pub fn run_terragrunt_import(
         ))
     }
 }
+
 
 
 

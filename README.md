@@ -133,7 +133,26 @@ google_artifact_registry_repository.remote_repos["mock-repo"]
 
 # Contributing
 
-## 🧪 Run Tests
+## Rust version
+
+### 🧪 Run Tests
+
+```bash
+cargo test
+```
+
+### Run Locally
+
+```bash
+ cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/modules --dry-run
+
+```
+
+
+
+## Legacy Bash version
+
+### 🧪 Run Tests
 
 ```bash
 ./test/entrypoint_test.sh
