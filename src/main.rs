@@ -3,25 +3,30 @@ mod importer;
 mod plan;
 mod utils;
 
-use crate::importer::{map_resources_to_modules, generate_import_commands, ModulesFile, PlanFile, infer_resource_id, Resource, PlannedModule, run_terragrunt_import};
+use crate::importer::{map_resources_to_modules, generate_import_commands, ModulesFile, PlanFile, infer_resource_id, Resource, PlannedModule, run_terragrunt_import, execute_or_print_imports};
 use clap::Parser;
 use std::fs;
 use std::path::Path;
+use crate::utils::collect_resources;
 
-/// CLI arguments
-#[derive(Parser)]
+#[derive(Parser, Debug)]
+#[command(name = "terragrunt_import_from_plan")]
+#[command(about = "Generates terragrunt import commands from a tf.plan JSON", long_about = None)]
 struct Args {
-    #[arg(short, long, default_value = "tests/fixtures/out.json")]
+    #[arg(long)]
     plan: String,
 
-    #[arg(short, long, default_value = "tests/fixtures/modules.json")]
+    #[arg(long)]
     modules: String,
 
-    #[arg(long, default_value = "simulator/modules")]
-    module_root: String,
+    #[arg(long)]
+    module_root: Option<String>,
 
     #[arg(long, default_value_t = false)]
     dry_run: bool,
+
+    #[arg(long, default_value_t = false)]
+    verbose: bool,
 }
 
 
@@ -40,50 +45,41 @@ fn load_plan<P: AsRef<Path>>(path: P) -> Result<PlanFile, Box<dyn std::error::Er
 fn main() {
     let args = Args::parse();
 
-    let modules_file = load_modules(&args.modules).expect("Failed to load modules");
+    let mut modules_file = load_modules(&args.modules).expect("Failed to load modules");
     let plan_file = load_plan(&args.plan).expect("Failed to load plan");
 
+    let module_root = args.module_root.clone().unwrap_or_else(|| ".".to_string());
     let mapping = map_resources_to_modules(&modules_file.modules, &plan_file);
+    execute_or_print_imports(&mapping, &plan_file, args.dry_run, args.verbose, &module_root);
 
     if args.dry_run {
-        let commands = generate_import_commands(&mapping);
+        let commands = generate_import_commands(&mapping, &plan_file, &module_root, args.dry_run);
         for cmd in commands {
             println!("{}", cmd);
         }
     } else {
-        for (resource_address, module_meta) in &mapping {
-            // Look up full Resource object from plan to infer ID
-            let mut inferred_id = None;
-            if let Some(planned_values) = &plan_file.planned_values {
-                fn search<'a>(module: &'a PlannedModule, addr: &str) -> Option<&'a Resource> {
-                    if let Some(resources) = &module.resources {
-                        if let Some(found) = resources.iter().find(|r| r.address == addr) {
-                            return Some(found);
-                        }
-                    }
-                    if let Some(children) = &module.child_modules {
-                        for child in children {
-                            if let Some(found) = search(child, addr) {
-                                return Some(found);
-                            }
-                        }
-                    }
-                    None
-                }
-                if let Some(resource) = search(&planned_values.root_module, resource_address) {
-                    inferred_id = infer_resource_id(resource);
-                }
-            }
+        if let Some(planned_values) = &plan_file.planned_values {
+            
+            let mut all_resources = vec![];
+            collect_resources(&planned_values.root_module, &mut all_resources);
 
-            if let Some(id) = inferred_id {
-                match run_terragrunt_import((&module_meta.dir).as_ref(), resource_address, &id) {
-                    Ok(_) => println!("✅ Imported {}", resource_address),
-                    Err(e) => eprintln!("❌ Error importing {}: {}", resource_address, e),
+            for resource in all_resources {
+                let inferred_id = infer_resource_id(&resource, args.verbose);
+
+                if let Some(id) = inferred_id {
+                    if let Some(module_meta) = mapping.get(&resource.address) {
+                        let module_path = Path::new(&module_meta.dir);
+                        match run_terragrunt_import(module_path, &resource.address, &id) {
+                            Ok(_) => println!("✅ Imported {}", resource.address),
+                            Err(e) => eprintln!("❌ Error importing {}: {}", resource.address, e),
+                        }
+                    } else {
+                        eprintln!("⚠️ Skipped {}: no matching module mapping", resource.address);
+                    }
+                } else {
+                    eprintln!("⚠️ Skipped {}: no ID could be inferred", resource.address);
                 }
-            } else {
-                eprintln!("⚠️ Skipped {}: no ID could be inferred", resource_address);
             }
         }
     }
 }
-

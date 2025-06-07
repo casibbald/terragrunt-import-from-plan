@@ -9,6 +9,8 @@ terragrunt_dir := env_var_or_default("TERRAGRUNT_DIR", "envs/simulator/")
 default:
     @just --list
 
+run:
+    cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/modules --dry-run
 
 gen:
     just init
