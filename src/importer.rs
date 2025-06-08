@@ -149,11 +149,6 @@ pub fn generate_import_commands(
         let mut all_resources = vec![];
         collect_resources(&planned_values.root_module, &mut all_resources);
 
-        let schema_map = &plan.provider_schemas.as_ref().and_then(|ps| ps.provider_schemas.values().next())
-            .and_then(|provider| provider.resource_schemas.as_ref())
-            .cloned()
-            .unwrap_or_default();
-
         for resource in all_resources {
             let terraform_resource = TerraformResource {
                 address: resource.address.clone(),
@@ -280,18 +275,7 @@ pub fn execute_or_print_imports(
         let mut imported = 0;
         let mut skipped = 0;
         let mut failed = 0;
-
-        let provider_schemas = match &plan.provider_schemas {
-            Some(ps) => &ps.provider_schemas,
-            None => {
-                eprintln!("No provider_schemas found in plan");
-                return;
-            }
-        };
-        let schema_map = &plan.provider_schemas.as_ref().and_then(|ps| ps.provider_schemas.values().next())
-            .and_then(|provider| provider.resource_schemas.as_ref())
-            .cloned()
-            .unwrap_or_default();
+        
 
         for resource in all_resources {
             let terraform_resource = TerraformResource {
@@ -407,7 +391,7 @@ fn check(
     module: &PlannedModule,
     found: &mut bool,
     verbose: bool,
-    schema_map: &HashMap<String, serde_json::Value>,
+    schema_map: &HashMap<String, Value>,
 ) {
     if let Some(resources) = &module.resources {
         for resource in resources {
@@ -438,7 +422,7 @@ fn check(
 mod tests {
     use super::*;
     use std::fs;
-    use std::hash::Hash;
+
 
     #[test]
     fn test_validate_module_dirs() {

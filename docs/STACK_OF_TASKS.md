@@ -32,11 +32,19 @@
   - [ ] Write table-driven tests with various resource examples
   - [ ] Fail gracefully and provide helpful messages if no ID can be determined
 - [ ] **External Provider Schema Integration**
-  - [ ] Add CLI option `--schema-file` to accept path to full provider schema
-  - [ ] Load and deserialize JSON file into `HashMap<String, Value>`
-  - [ ] Use this as primary source for resource attribute scoring
+  - [ ] Automatically run `terragrunt init` and then `terragrunt providers schema -json` inside `--module-root` to extract schema
+  - [ ] Write schema to `.terragrunt-provider-schema.json`
+  - [ ] Load this file dynamically as primary source for resource attribute scoring
   - [ ] Fallback to embedded plan schemas or heuristic scoring if missing
-  - [ ] Update docs and error messages to recommend `terraform providers schema -json`
+  - [ ] Skip CLI flag and integrate provider schema transparently for end users
+  - [ ] Parse output of `terraform providers schema -json` into internal `ProviderSchemaMap`
+  - [ ] Map resource types from plan to entries in schema file for ID logic
+  - [ ] Validate schema contents and report any mismatches
+  - [ ] Implement `write_provider_schema()` to invoke CLI and write file
+  - [ ] Integrate invocation into `main.rs` pre-import step if schema file missing
+  - [ ] Add CLI verbose logging around schema invocation and fallback path
+  - [ ] Unit test for schema file generation using sandbox
+
 - [ ] **Support `--filter-type=TYPE`** to import only specific resource types
 - [ ] **Support `--address=ADDRESS`** to import only a specific resource address
 - [ ] **Handle non-importable resources gracefully (e.g., data sources)**
@@ -57,6 +65,11 @@
 - [ ] **Compile Rust binary within GitHub Action**
 - [ ] **Run binary with simulated plan + module input**
 - [ ] **Emit structured import summary in GitHub job output**
+
+#### 📚 Developer Experience & Docs
+- [ ] Add architecture diagrams (sequence, context, flowcharts) to `docs/ARCH.md`
+- [ ] Document how schema extraction works in AGENTS.md or ARCH.md
+- [ ] Simplify onboarding with setup walkthrough and CLI examples
 
 ---
 

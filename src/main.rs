@@ -5,13 +5,12 @@ mod importer;
 mod plan;
 mod utils;
 
-use crate::importer::{map_resources_to_modules, generate_import_commands, ModulesFile, PlanFile, infer_resource_id, Resource, PlannedModule, run_terragrunt_import, execute_or_print_imports};
+use crate::importer::{execute_or_print_imports, generate_import_commands, infer_resource_id, map_resources_to_modules, run_terragrunt_import, ModulesFile, PlanFile};
+use crate::plan::TerraformResource;
+use crate::utils::{collect_resources, run_terragrunt_init, write_provider_schema};
 use clap::Parser;
 use std::fs;
 use std::path::Path;
-use std::process::id;
-use crate::plan::TerraformResource;
-use crate::utils::collect_resources;
 
 #[derive(Parser, Debug)]
 #[command(name = "terragrunt_import_from_plan")]
@@ -31,6 +30,9 @@ struct Args {
 
     #[arg(long, default_value_t = false)]
     verbose: bool,
+
+    #[arg(long,)]
+    working_directory: Option<String>,
 }
 
 
@@ -49,10 +51,16 @@ fn load_plan<P: AsRef<Path>>(path: P) -> Result<PlanFile, Box<dyn std::error::Er
 fn main() {
     let args = Args::parse();
 
-    let mut modules_file = load_modules(&args.modules).expect("Failed to load modules");
+    let modules_file = load_modules(&args.modules).expect("Failed to load modules");
     let plan_file = load_plan(&args.plan).expect("Failed to load plan");
-
     let module_root = args.module_root.clone().unwrap_or_else(|| ".".to_string());
+    // let module_root_path = Path::new(&module_root);
+
+    // 🌐 Ensure provider schema is extracted before loading the plan
+    run_terragrunt_init(args.working_directory.as_deref().unwrap_or(".")).expect("terragrunt init failed");
+    if let Err(e) = write_provider_schema(Path::new(&format!("{}", args.working_directory.as_deref().unwrap_or(".")))) {
+        eprintln!("⚠️ Failed to generate provider schema: {}", e);
+    }
     let mapping = map_resources_to_modules(&modules_file.modules, &plan_file);
     execute_or_print_imports(&mapping, &plan_file, args.dry_run, args.verbose, &module_root);
 
