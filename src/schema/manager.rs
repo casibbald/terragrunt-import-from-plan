@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 use anyhow::{Result, Context};
 use crate::importer::PlanFile;
-use crate::schema::write_provider_schema;
+use crate::schema::{write_provider_schema, AttributeMetadata, ResourceAttributeMap, AttributeMetadataError};
 
 /// Centralized schema management for provider schemas and ID candidate extraction
 #[derive(Debug)]
@@ -147,5 +147,107 @@ impl SchemaManager {
     /// Check if schema is cached
     pub fn has_cached_schema(&self) -> bool {
         self.cache.contains_key("provider_schema")
+    }
+
+    /// Parse resource attributes with full metadata for a specific resource type
+    /// 
+    /// This extracts detailed attribute information from the cached schema,
+    /// including whether attributes are required, computed, optional, their types, etc.
+    pub fn parse_resource_attributes(&self, resource_type: &str) -> Result<ResourceAttributeMap, AttributeMetadataError> {
+        let mut attributes = HashMap::new();
+        
+        // Get the cached schema
+        let schema = self.cache.get("provider_schema")
+            .ok_or_else(|| AttributeMetadataError::ParseError { 
+                message: "No schema loaded. Call load_or_generate_schema() first.".to_string() 
+            })?;
+
+        // Navigate to the resource schema: 
+        // .provider_schemas["registry.terraform.io/hashicorp/google"].resource_schemas[resource_type].block.attributes
+        let resource_schema = schema
+            .get("provider_schemas")
+            .and_then(|ps| ps.as_object())
+            .and_then(|ps_obj| {
+                // Try different provider name patterns
+                ps_obj.get("registry.terraform.io/hashicorp/google")
+                    .or_else(|| ps_obj.get("google"))
+                    .or_else(|| ps_obj.values().next()) // Fallback to first provider
+            })
+            .and_then(|provider| provider.get("resource_schemas"))
+            .and_then(|rs| rs.get(resource_type))
+            .and_then(|resource| resource.get("block"))
+            .and_then(|block| block.get("attributes"))
+            .and_then(|attrs| attrs.as_object())
+            .ok_or_else(|| AttributeMetadataError::ParseError {
+                message: format!("Could not find attributes for resource type: {}", resource_type)
+            })?;
+
+        // Parse each attribute into AttributeMetadata
+        for (attr_name, attr_value) in resource_schema {
+            match AttributeMetadata::from_schema_value(attr_value) {
+                Ok(metadata) => {
+                    attributes.insert(attr_name.clone(), metadata);
+                }
+                Err(e) => {
+                    eprintln!("⚠️ Warning: Failed to parse attribute '{}' for resource '{}': {}", attr_name, resource_type, e);
+                    // Continue processing other attributes instead of failing completely
+                }
+            }
+        }
+
+        Ok(attributes)
+    }
+
+    /// Get metadata for a specific attribute of a resource type
+    pub fn get_attribute_metadata(&self, resource_type: &str, attr_name: &str) -> Result<Option<AttributeMetadata>, AttributeMetadataError> {
+        let attributes = self.parse_resource_attributes(resource_type)?;
+        Ok(attributes.get(attr_name).cloned())
+    }
+
+    /// Get all potential ID candidate attributes for a resource type using real schema metadata
+    /// 
+    /// This replaces the old hardcoded approach with schema-driven intelligence
+    pub fn get_id_candidate_attributes(&self, resource_type: &str) -> Result<Vec<(String, AttributeMetadata)>, AttributeMetadataError> {
+        let attributes = self.parse_resource_attributes(resource_type)?;
+        
+        let mut candidates: Vec<(String, AttributeMetadata)> = attributes
+            .into_iter()
+            .filter(|(_, metadata)| metadata.is_potential_id())
+            .collect();
+        
+        // Sort by base score (highest first)
+        candidates.sort_by(|a, b| {
+            b.1.calculate_base_score()
+                .partial_cmp(&a.1.calculate_base_score())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        
+        Ok(candidates)
+    }
+
+    /// List all available resource types in the loaded schema
+    pub fn list_resource_types(&self) -> Result<Vec<String>, AttributeMetadataError> {
+        let schema = self.cache.get("provider_schema")
+            .ok_or_else(|| AttributeMetadataError::ParseError { 
+                message: "No schema loaded. Call load_or_generate_schema() first.".to_string() 
+            })?;
+
+        let resource_types = schema
+            .get("provider_schemas")
+            .and_then(|ps| ps.as_object())
+            .and_then(|ps_obj| {
+                // Try different provider name patterns
+                ps_obj.get("registry.terraform.io/hashicorp/google")
+                    .or_else(|| ps_obj.get("google"))
+                    .or_else(|| ps_obj.values().next())
+            })
+            .and_then(|provider| provider.get("resource_schemas"))
+            .and_then(|rs| rs.as_object())
+            .map(|rs_obj| rs_obj.keys().cloned().collect())
+            .ok_or_else(|| AttributeMetadataError::ParseError {
+                message: "Could not extract resource types from schema".to_string()
+            })?;
+
+        Ok(resource_types)
     }
 } 

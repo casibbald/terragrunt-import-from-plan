@@ -1,8 +1,13 @@
+> ⚠️ **IMPORTANT CONSTRAINT**: Terraform/Terragrunt state management does **NOT** support concurrent access. 
+> Parallel execution of import operations would result in state corruption and locking conflicts.
+> All import operations must be executed sequentially to maintain state integrity.
+
+
 ## 📊 **Current Status Summary**
-**🧪 Test Suite: ✅ 54/54 tests passing (18 integration + 21 main + 15 lib tests)**  
+**🧪 Test Suite: ✅ 54/54 tests passing (15 unit + 21 binary + 18 integration tests)**  
 **🏗️ Core Infrastructure: ✅ Complete with full resource import workflow**  
-**🔧 Provider Schema: ✅ Basic implementation with graceful error handling**  
-**🚀 Refactoring: ✅ Phase 1 completed - Code modularized into reusable components**  
+**🔧 Provider Schema: ✅ Centralized schema management with SchemaManager**  
+**🚀 Refactoring: ✅ Phase 1, 2 & 3 completed - Advanced architecture with pluggable strategies**  
 
 ---
 
@@ -26,7 +31,7 @@
 - [x] Audit plan JSON for frequent alternative ID fields (`bucket`, `project`, `self_link`, etc.)
 - [x] Update `main.rs` to deserialize plan JSON into `TerraformPlan` and extract `TerraformResource` list
 - [x] Refactored `collect_resources()` into `utils::collect_all_resources()` to avoid code duplication
-- [x] Comprehensive test suite with 23 integration tests covering all core functionality
+- [x] Comprehensive test suite with 54 tests covering all core functionality (15 unit + 21 binary + 18 integration)
 - [x] End-to-end testing via shell script with mocked terragrunt commands
 - [x] Test fixtures with realistic GCP resource data (266KB plan file, module mappings)
 
@@ -46,11 +51,11 @@
   - [x] Test fixtures for common resource types (modules.json, out.json)
   - [x] Provider schema generation tests (test_10-12, test_18)
   - [x] Resource collection and mapping tests (test_01-03, test_13-17)
-  - [ ] Add test coverage reporting (current: 23 tests passing)
+  - [ ] Add test coverage reporting (current: 54 tests passing)
   - [ ] Implement integration tests with actual cloud providers (currently mocked via echo commands)
   - [ ] Add performance benchmarks for large plans (current fixtures: 266KB plan, 20 modules)
   - [ ] Add error scenario tests for network failures, malformed JSON, etc.
-  - [ ] Add concurrent execution tests for parallel imports
+  - [ ] Add sequential batch optimization tests
   - [ ] Add tests for various GCP resource types beyond current artifacts/storage focus
 
 #### 🔧 Provider Schema Extraction (Medium Priority)
@@ -109,7 +114,7 @@
   - [ ] Support `--filter-type=TYPE` to import only specific resource types
   - [ ] Support `--address=ADDRESS` to import only a specific resource address
   - [ ] Handle non-importable resources gracefully (e.g., data sources)
-  - [ ] Add parallel import execution option
+  - [ ] Add sequential batch processing optimization
   - [ ] Implement progress indicators for long-running imports
 
 #### 📦 CLI & Config Polish
@@ -155,23 +160,32 @@
   - [ ] Add performance monitoring
   - [ ] Implement resource batching for large imports
 
-#### 🏗️ Code Refactoring (New Priority)
+#### 🏗️ Code Refactoring (Completed)
 - [x] **Phase 1: Quick Wins (High Impact, Low Risk) ✅ COMPLETED**
   - [x] Merge duplicate functions (`collect_resources()` and `collect_all_resources()`)
   - [x] Extract file loading logic from `main()` into separate functions (`src/app.rs`)
   - [x] Extract import summary reporting to dedicated function (`src/reporting.rs`)
   - [x] Add error context using `anyhow` with detailed context messages
-- [ ] **Phase 2: Core Refactoring (Medium Risk, High Impact)**
-  - [ ] Break down `main()` function (80+ lines) into workflow components
-  - [ ] Refactor `execute_or_print_imports()` (80+ lines) into smaller functions
-  - [ ] Extract resource processing pipeline into reusable components
-  - [ ] Centralize schema management across files
-  - [ ] Separate import command building from execution
-- [ ] **Phase 3: Architecture Improvements (Future)**
-  - [ ] Implement pluggable scoring strategies for different providers
-  - [ ] Add support for multiple cloud providers
-  - [ ] Implement advanced caching strategies
-  - [ ] Add parallel import execution capabilities
+
+- [x] **Phase 2: Core Refactoring (Medium Risk, High Impact) ✅ COMPLETED**
+  - [x] Break down `main()` function (80+ lines) into workflow components
+  - [x] Refactor `execute_or_print_imports()` (80+ lines) into smaller functions
+  - [x] Extract resource processing pipeline into reusable components
+  - [x] Created focused helper functions: `collect_and_prepare_resources()`, `process_single_resource()`, `execute_import_for_resource()`
+  - [x] Reduced function complexity by 55% (80+ lines → 36 lines)
+
+- [x] **Phase 3: Advanced Architecture ✅ COMPLETED**
+  - [x] Centralize schema management with `SchemaManager` struct (`src/schema/manager.rs`)
+  - [x] Separate command building from execution (`src/commands/` module)
+  - [x] Implement pluggable scoring strategies for different providers (`src/scoring/` module)
+  - [x] Foundation for multi-provider support (GCP, Azure, AWS, Generic strategies)
+  - [x] Trait-based architecture for extensibility
+
+- [ ] **Phase 4: Future Enhancements (Planned)**
+  - [ ] Sequential processing optimizations (respecting terraform state constraints)
+  - [ ] Advanced caching strategies
+  - [ ] Multi-provider expansion
+  - [ ] Performance monitoring and metrics
 
 **📊 Analysis Complete**: See `docs/REFACTORING_ANALYSIS.md` for detailed breakdown
 

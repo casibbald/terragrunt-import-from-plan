@@ -1,4 +1,5 @@
 pub mod manager;
+pub mod metadata;
 
 use std::fs;
 use std::path::Path;
@@ -7,6 +8,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 pub use manager::SchemaManager;
+pub use metadata::{AttributeMetadata, ResourceAttributeMap, AttributeMetadataError};
 
 #[derive(Error, Debug)]
 pub enum SchemaError {

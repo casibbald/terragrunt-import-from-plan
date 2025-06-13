@@ -102,6 +102,9 @@ impl ImportExecutor {
     }
 
     /// Execute a batch of import commands sequentially
+    /// 
+    /// IMPORTANT: Commands MUST be executed sequentially due to terraform state management
+    /// limitations. Concurrent execution would cause state corruption and locking conflicts.
     pub fn execute_batch(&self, commands: &[ImportCommand]) -> BatchResult {
         let start_time = std::time::Instant::now();
         let mut successful = Vec::new();
@@ -109,8 +112,8 @@ impl ImportExecutor {
 
         for command in commands {
             match self.execute_command(command) {
-                Ok(ImportResult::Success { .. }) => {
-                    successful.push(self.execute_command(command).unwrap());
+                Ok(result @ ImportResult::Success { .. }) => {
+                    successful.push(result);
                 }
                 Ok(result @ ImportResult::Failed { .. }) => {
                     failed.push(result);
