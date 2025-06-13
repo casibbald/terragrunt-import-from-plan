@@ -1,0 +1,10 @@
+{
+    "coverage": {
+        "exclude": [
+            "tests/*",
+            "benches/*",
+            "examples/*"
+        ],
+        "fail-under": 80
+    }
+} 

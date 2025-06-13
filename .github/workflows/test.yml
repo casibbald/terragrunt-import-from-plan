@@ -55,7 +55,7 @@ jobs:
 
 
       - name: Dry dry
-        run: cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/modules --dry-run
+        run: cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/modules --dry-run --working-directory envs/simulator/dev
 #
 #      - name: Run just plan
 #        run: just plan

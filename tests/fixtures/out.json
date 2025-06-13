@@ -1061,6 +1061,7 @@
                 "min_master_version": null,
                 "name": "sim-gke-cluster",
                 "network": "default",
+                "network_performance_config": [],
                 "network_policy": [],
                 "private_cluster_config": [],
                 "project": "your-gcp-project-id",
@@ -1103,6 +1104,7 @@
                 "master_authorized_networks_config": [],
                 "mesh_certificates": [],
                 "monitoring_config": [],
+                "network_performance_config": [],
                 "network_policy": [],
                 "node_config": [],
                 "node_locations": [],
@@ -1144,6 +1146,7 @@
                     "enable_confidential_storage": null,
                     "ephemeral_storage_local_ssd_config": [],
                     "fast_socket": [],
+                    "flex_start": null,
                     "gvnic": [],
                     "host_maintenance_policy": [],
                     "linux_node_config": [],
@@ -1790,6 +1793,7 @@
                 "filter": null,
                 "labels": null,
                 "message_retention_duration": "604800s",
+                "message_transforms": [],
                 "name": "sim-subscription",
                 "project": "your-gcp-project-id",
                 "push_config": [],
@@ -1806,6 +1810,7 @@
                 "dead_letter_policy": [],
                 "effective_labels": {},
                 "expiration_policy": [],
+                "message_transforms": [],
                 "push_config": [],
                 "retry_policy": [],
                 "terraform_labels": {}
@@ -1826,6 +1831,7 @@
                 "kms_key_name": null,
                 "labels": null,
                 "message_retention_duration": null,
+                "message_transforms": [],
                 "name": "sim-topic",
                 "project": "your-gcp-project-id",
                 "schema_settings": [],
@@ -1838,6 +1844,7 @@
                 "effective_labels": {},
                 "ingestion_data_source_settings": [],
                 "message_storage_policy": [],
+                "message_transforms": [],
                 "schema_settings": [],
                 "terraform_labels": {}
               }
@@ -3811,6 +3818,7 @@
           "min_master_version": null,
           "name": "sim-gke-cluster",
           "network": "default",
+          "network_performance_config": [],
           "network_policy": [],
           "private_cluster_config": [],
           "project": "your-gcp-project-id",
@@ -3867,6 +3875,7 @@
           "mesh_certificates": true,
           "monitoring_config": true,
           "monitoring_service": true,
+          "network_performance_config": [],
           "network_policy": [],
           "networking_mode": true,
           "node_config": true,
@@ -3924,6 +3933,7 @@
           "master_authorized_networks_config": [],
           "mesh_certificates": [],
           "monitoring_config": [],
+          "network_performance_config": [],
           "network_policy": [],
           "node_config": [],
           "node_locations": [],
@@ -3971,6 +3981,7 @@
               "enable_confidential_storage": null,
               "ephemeral_storage_local_ssd_config": [],
               "fast_socket": [],
+              "flex_start": null,
               "gvnic": [],
               "host_maintenance_policy": [],
               "linux_node_config": [],
@@ -4988,6 +4999,7 @@
           "filter": null,
           "labels": null,
           "message_retention_duration": "604800s",
+          "message_transforms": [],
           "name": "sim-subscription",
           "project": "your-gcp-project-id",
           "push_config": [],
@@ -5005,6 +5017,7 @@
           "effective_labels": {},
           "expiration_policy": true,
           "id": true,
+          "message_transforms": [],
           "push_config": [],
           "retry_policy": [],
           "terraform_labels": {},
@@ -5017,6 +5030,7 @@
           "dead_letter_policy": [],
           "effective_labels": {},
           "expiration_policy": [],
+          "message_transforms": [],
           "push_config": [],
           "retry_policy": [],
           "terraform_labels": {}
@@ -5043,6 +5057,7 @@
           "kms_key_name": null,
           "labels": null,
           "message_retention_duration": null,
+          "message_transforms": [],
           "name": "sim-topic",
           "project": "your-gcp-project-id",
           "schema_settings": [],
@@ -5056,6 +5071,7 @@
           "id": true,
           "ingestion_data_source_settings": [],
           "message_storage_policy": true,
+          "message_transforms": [],
           "schema_settings": [],
           "terraform_labels": {}
         },
@@ -5064,6 +5080,7 @@
           "effective_labels": {},
           "ingestion_data_source_settings": [],
           "message_storage_policy": [],
+          "message_transforms": [],
           "schema_settings": [],
           "terraform_labels": {}
         }
@@ -7966,63 +7983,29 @@
   },
   "relevant_attributes": [
     {
-      "resource": "module.iam.google_project_iam_custom_role.developer",
+      "resource": "module.cloud_run.google_cloud_run_service.example",
+      "attribute": [
+        "status",
+        0,
+        "url"
+      ]
+    },
+    {
+      "resource": "module.gke.google_container_node_pool.primary_nodes",
       "attribute": [
         "name"
       ]
     },
     {
-      "resource": "module.iam.google_service_account.example_sa",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.kms.google_kms_key_ring.example",
+      "resource": "module.networking.google_compute_network.default",
       "attribute": [
         "id"
       ]
     },
     {
-      "resource": "module.networking.google_compute_router.router",
+      "resource": "module.secret_manager.google_secret_manager_secret.example",
       "attribute": [
         "id"
-      ]
-    },
-    {
-      "resource": "module.cloud_functions.google_storage_bucket_object.source_archive",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.gke.google_container_cluster.primary",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.cloud_sql.google_sql_database.default",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.kms.google_kms_crypto_key.example",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.networking.google_compute_subnetwork.default",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.storage.google_storage_bucket.example",
-      "attribute": [
-        "name"
       ]
     },
     {
@@ -8032,11 +8015,7 @@
       ]
     },
     {
-      "resource": "module.enable_apis.google_project_service.required_services",
-      "attribute": []
-    },
-    {
-      "resource": "module.secret_manager.google_secret_manager_secret_version.version",
+      "resource": "module.secret_manager.google_secret_manager_secret.example",
       "attribute": [
         "name"
       ]
@@ -8048,157 +8027,13 @@
       ]
     },
     {
-      "resource": "module.dataproc.google_dataproc_cluster.example",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.cloud_run.google_cloud_run_service.example",
-      "attribute": [
-        "location"
-      ]
-    },
-    {
-      "resource": "module.cloud_sql.google_sql_database_instance.example",
+      "resource": "module.cloud_sql.google_sql_database.default",
       "attribute": [
         "name"
       ]
     },
     {
       "resource": "module.networking.google_compute_network.default",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.cloud_functions.google_storage_bucket.example",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.pubsub.google_pubsub_subscription.example",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.monitoring.google_monitoring_alert_policy.basic_policy",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.artifact_registry.google_artifact_registry_repository.docker_repo",
-      "attribute": [
-        "repository_id"
-      ]
-    },
-    {
-      "resource": "module.cloud_sql.google_sql_database_instance.example",
-      "attribute": [
-        "connection_name"
-      ]
-    },
-    {
-      "resource": "module.cloud_functions.google_cloudfunctions_function.example",
-      "attribute": [
-        "https_trigger_url"
-      ]
-    },
-    {
-      "resource": "module.bigquery.google_bigquery_table.example",
-      "attribute": [
-        "table_id"
-      ]
-    },
-    {
-      "resource": "module.gke.google_container_node_pool.primary_nodes",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.pubsub.google_pubsub_topic.example",
-      "attribute": [
-        "id"
-      ]
-    },
-    {
-      "resource": "module.monitoring.google_monitoring_notification_channel.email",
-      "attribute": [
-        "id"
-      ]
-    },
-    {
-      "resource": "module.networking.google_compute_address.static_ip",
-      "attribute": [
-        "address"
-      ]
-    },
-    {
-      "resource": "module.pubsub.google_pubsub_topic.example",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.secret_manager.google_secret_manager_secret.example",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.cloud_sql.google_sql_user.default",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.secret_manager.google_secret_manager_secret.example",
-      "attribute": [
-        "id"
-      ]
-    },
-    {
-      "resource": "module.spanner.google_spanner_instance.example",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.iam.google_service_account.example_sa",
-      "attribute": [
-        "email"
-      ]
-    },
-    {
-      "resource": "module.networking.google_compute_network.default",
-      "attribute": [
-        "id"
-      ]
-    },
-    {
-      "resource": "module.workflows.google_workflows_workflow.example",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.cloud_run.google_cloud_run_service.example",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.composer.google_composer_environment.example",
-      "attribute": [
-        "name"
-      ]
-    },
-    {
-      "resource": "module.cloud_functions.google_storage_bucket.source",
       "attribute": [
         "name"
       ]
@@ -8210,17 +8045,87 @@
       ]
     },
     {
-      "resource": "module.logging.google_logging_metric.example",
+      "resource": "module.cloud_functions.google_storage_bucket.example",
       "attribute": [
         "name"
       ]
     },
     {
-      "resource": "module.cloud_run.google_cloud_run_service.example",
+      "resource": "module.networking.google_compute_address.static_ip",
       "attribute": [
-        "status",
-        0,
-        "url"
+        "address"
+      ]
+    },
+    {
+      "resource": "module.monitoring.google_monitoring_alert_policy.basic_policy",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.networking.google_compute_subnetwork.default",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.iam.google_service_account.example_sa",
+      "attribute": [
+        "email"
+      ]
+    },
+    {
+      "resource": "module.pubsub.google_pubsub_topic.example",
+      "attribute": [
+        "id"
+      ]
+    },
+    {
+      "resource": "module.cloud_functions.google_storage_bucket_object.source_archive",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.dataproc.google_dataproc_cluster.example",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.bigquery.google_bigquery_table.example",
+      "attribute": [
+        "table_id"
+      ]
+    },
+    {
+      "resource": "module.cloud_functions.google_cloudfunctions_function.example",
+      "attribute": [
+        "https_trigger_url"
+      ]
+    },
+    {
+      "resource": "module.monitoring.google_monitoring_notification_channel.email",
+      "attribute": [
+        "id"
+      ]
+    },
+    {
+      "resource": "module.storage.google_storage_bucket.example",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.iam.google_project_iam_custom_role.developer",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.pubsub.google_pubsub_subscription.example",
+      "attribute": [
+        "name"
       ]
     },
     {
@@ -8228,9 +8133,121 @@
       "attribute": [
         "name"
       ]
+    },
+    {
+      "resource": "module.kms.google_kms_key_ring.example",
+      "attribute": [
+        "id"
+      ]
+    },
+    {
+      "resource": "module.iam.google_service_account.example_sa",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.logging.google_logging_metric.example",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.kms.google_kms_crypto_key.example",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.workflows.google_workflows_workflow.example",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.cloud_sql.google_sql_user.default",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.cloud_run.google_cloud_run_service.example",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.cloud_sql.google_sql_database_instance.example",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.gke.google_container_cluster.primary",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.pubsub.google_pubsub_topic.example",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.spanner.google_spanner_instance.example",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.networking.google_compute_router.router",
+      "attribute": [
+        "id"
+      ]
+    },
+    {
+      "resource": "module.cloud_sql.google_sql_database_instance.example",
+      "attribute": [
+        "connection_name"
+      ]
+    },
+    {
+      "resource": "module.artifact_registry.google_artifact_registry_repository.docker_repo",
+      "attribute": [
+        "repository_id"
+      ]
+    },
+    {
+      "resource": "module.secret_manager.google_secret_manager_secret_version.version",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.cloud_functions.google_storage_bucket.source",
+      "attribute": [
+        "name"
+      ]
+    },
+    {
+      "resource": "module.cloud_run.google_cloud_run_service.example",
+      "attribute": [
+        "location"
+      ]
+    },
+    {
+      "resource": "module.enable_apis.google_project_service.required_services",
+      "attribute": []
+    },
+    {
+      "resource": "module.composer.google_composer_environment.example",
+      "attribute": [
+        "name"
+      ]
     }
   ],
-  "timestamp": "2025-06-06T08:39:50Z",
+  "timestamp": "2025-06-13T14:28:24Z",
   "applyable": true,
   "complete": true,
   "errored": false

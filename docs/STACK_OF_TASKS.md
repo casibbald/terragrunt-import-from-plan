@@ -23,6 +23,41 @@
 
 ### 🛠️ **Remaining Tasks**
 
+#### 🧪 Testing & Validation (High Priority)
+- [ ] **Unit Tests & Code Quality**
+  - [ ] Write unit tests for core functions:
+    - [ ] `infer_resource_id()` with various resource types
+    - [ ] `run_terragrunt_import()` with success/failure cases
+    - [ ] `map_resources_to_modules()` with complex module structures
+    - [ ] `extract_id_candidate_fields()` with different schemas
+  - [ ] Add test coverage reporting
+  - [ ] Implement integration tests with actual cloud providers
+  - [ ] Create test fixtures for common resource types
+  - [ ] Add performance benchmarks for large plans
+
+#### 🔧 Provider Schema Extraction (High Priority)
+- [ ] **Fix Provider Schema Extraction**
+  - [ ] Debug and fix `write_provider_schema()` function
+    - [ ] Verify correct working directory handling
+    - [ ] Ensure proper error propagation
+    - [ ] Add logging for debugging
+  - [ ] Implement proper schema file writing
+    - [ ] Handle file permissions correctly
+    - [ ] Add file locking for concurrent access
+    - [ ] Implement proper error handling for file operations
+  - [ ] Add schema validation
+    - [ ] Verify JSON structure
+    - [ ] Check for required provider fields
+    - [ ] Validate schema version compatibility
+  - [ ] Add schema caching
+    - [ ] Implement cache invalidation strategy
+    - [ ] Add cache versioning
+    - [ ] Handle cache corruption gracefully
+  - [ ] Add CLI integration
+    - [ ] Add `--force-schema-refresh` flag
+    - [ ] Add schema path configuration
+    - [ ] Add schema validation verbosity options
+
 #### 🧩 Functionality Enhancements
 - [ ] **Enhanced ID inference**: Use additional fields like `bucket`, `self_link`, etc.
   - [ ] Extract candidate fields dynamically from `provider_schemas.resource_schemas`
@@ -31,32 +66,79 @@
   - [ ] Include verbose diagnostics to log which field was selected (if `--verbose` is set)
   - [ ] Write table-driven tests with various resource examples
   - [ ] Fail gracefully and provide helpful messages if no ID can be determined
+
 - [ ] **External Provider Schema Integration**
-  - [ ] Add CLI option `--schema-file` to accept path to full provider schema
-  - [ ] Load and deserialize JSON file into `HashMap<String, Value>`
-  - [ ] Use this as primary source for resource attribute scoring
+  - [ ] Automatically run `terragrunt init` and then `terragrunt providers schema -json` inside `--module-root` to extract schema
+  - [ ] Write schema to `.terragrunt-provider-schema.json`
+  - [ ] Load this file dynamically as primary source for resource attribute scoring
   - [ ] Fallback to embedded plan schemas or heuristic scoring if missing
-  - [ ] Update docs and error messages to recommend `terraform providers schema -json`
-- [ ] **Support `--filter-type=TYPE`** to import only specific resource types
-- [ ] **Support `--address=ADDRESS`** to import only a specific resource address
-- [ ] **Handle non-importable resources gracefully (e.g., data sources)**
+  - [ ] Skip CLI flag and integrate provider schema transparently for end users
+  - [ ] Parse output of `terraform providers schema -json` into internal `ProviderSchemaMap`
+  - [ ] Map resource types from plan to entries in schema file for ID logic
+  - [ ] Validate schema contents and report any mismatches
+  - [ ] Implement `write_provider_schema()` to invoke CLI and write file
+  - [ ] Integrate invocation into `main.rs` pre-import step if schema file missing
+  - [ ] Add CLI verbose logging around schema invocation and fallback path
+  - [ ] Unit test for schema file generation using sandbox
+
+- [ ] **Error Handling & Recovery**
+  - [ ] Implement retry mechanisms for transient failures
+  - [ ] Add detailed error reporting and logging
+  - [ ] Create troubleshooting guide for common errors
+  - [ ] Add error recovery strategies
+  - [ ] Implement state file backup before imports
+  - [ ] Add state file validation after imports
+  - [ ] Add rollback capability for failed imports
+
+- [ ] **Resource Management**
+  - [ ] Support `--filter-type=TYPE` to import only specific resource types
+  - [ ] Support `--address=ADDRESS` to import only a specific resource address
+  - [ ] Handle non-importable resources gracefully (e.g., data sources)
+  - [ ] Add parallel import execution option
+  - [ ] Implement progress indicators for long-running imports
 
 #### 📦 CLI & Config Polish
-- [ ] **Respect and validate `--module-root` directory structure**
-- [ ] **Ensure `--verbose` prints detailed diagnostics**
-- [ ] **Add support for configurable `--config-dir` path base**
-- [ ] **Ensure default paths function correctly within GitHub Actions**
+- [ ] **Input Validation & Security**
+  - [ ] Add input validation for all CLI arguments
+  - [ ] Implement secure credential handling
+  - [ ] Add audit logging for import operations
+  - [ ] Add security scanning in CI pipeline
 
-#### 🧪 Testing & Validation
-- [ ] **Unit tests** for all major functions (`infer_resource_id`, `run_terragrunt_import`, etc.)
-- [ ] **Integration test**: Generate real `tf.plan` via Terragrunt and validate imports
-- [ ] **Mocked import testing** to simulate imports without actual GCP
-- [ ] **CI GitHub Action test** validating dry-run output
+- [ ] **Configuration & Paths**
+  - [ ] Respect and validate `--module-root` directory structure
+  - [ ] Ensure `--verbose` prints detailed diagnostics
+  - [ ] Add support for configurable `--config-dir` path base
+  - [ ] Ensure default paths function correctly within GitHub Actions
+  - [ ] Implement configuration file support
+  - [ ] Add interactive mode option
 
 #### 🚀 GitHub Action Integration
-- [ ] **Compile Rust binary within GitHub Action**
-- [ ] **Run binary with simulated plan + module input**
-- [ ] **Emit structured import summary in GitHub job output**
+- [ ] **Build & Release**
+  - [ ] Compile Rust binary within GitHub Action
+  - [ ] Run binary with simulated plan + module input
+  - [ ] Emit structured import summary in GitHub job output
+  - [ ] Set up automated release process
+  - [ ] Implement version management
+  - [ ] Add release notes generation
+  - [ ] Create binary distribution pipeline
+
+#### 📚 Developer Experience & Docs
+- [ ] **Documentation**
+  - [ ] Add architecture diagrams (sequence, context, flowcharts) to `docs/ARCH.md`
+  - [ ] Document how schema extraction works in AGENTS.md or ARCH.md
+  - [ ] Simplify onboarding with setup walkthrough and CLI examples
+  - [ ] Add API documentation
+  - [ ] Create detailed usage examples
+  - [ ] Add contributing guidelines
+  - [ ] Document best practices
+  - [ ] Create comprehensive troubleshooting guide
+
+#### 🔧 Performance & Optimization
+- [ ] **Optimization Tasks**
+  - [ ] Implement caching for provider schemas
+  - [ ] Optimize memory usage for large plan processing
+  - [ ] Add performance monitoring
+  - [ ] Implement resource batching for large imports
 
 ---
 

@@ -9,4 +9,10 @@ serde_json = "1.0"
 regex = "1.10"
 anyhow = "1.0"
 clap = { version = "4.0", features = ["derive"] }
+glob = "0.3"
+tempfile = "3.8"
+thiserror = "1.0"
 
+[dev-dependencies]
+tempfile = "3.8"
+cargo-llvm-cov = "0.6"
