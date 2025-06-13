@@ -6,6 +6,22 @@ use std::io;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::fs;
+use thiserror::Error;
+
+pub use crate::schema::write_provider_schema;
+
+#[derive(Error, Debug)]
+pub enum TerragruntProcessError {
+    #[error("Failed to run terragrunt: status={status}, stdout={stdout}, stderr={stderr}")]
+    ProcessError {
+        status: i32,
+        stdout: String,
+        stderr: String,
+    },
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
 
 pub fn collect_resources<'a>(module: &'a PlannedModule, all: &mut Vec<&'a Resource>) {
     if let Some(res) = &module.resources {
@@ -53,53 +69,154 @@ pub fn extract_id_candidate_fields(schema_json: &Value) -> HashSet<String> {
     candidates
 }
 
-pub fn run_terragrunt_init(working_directory: &str) -> io::Result<()> {
+pub fn run_terragrunt_init(working_directory: &str) -> Result<(), TerragruntProcessError> {
     println!("🔧 Running `terragrunt init` in {}", working_directory);
 
-    let status = Command::new("terragrunt")
+    let output = Command::new("terragrunt")
         .arg("init")
         .current_dir(working_directory)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()?;
+        .output()?;
 
-    if status.success() {
+    if output.status.success() {
         Ok(())
     } else {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("`terragrunt init` failed in {}", working_directory)
-        ))
+        Err(TerragruntProcessError::ProcessError {
+            status: output.status.code().unwrap_or(-1),
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        })
     }
 }
 
-
-
-/// Runs `terragrunt providers schema -json` and writes the output to `.terragrunt-provider-schema.json`
-/// inside the specified `module_root` directory.
-pub fn write_provider_schema(working_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    println!("📦 Extracting provider schema in {}", working_dir.display());
-
-    let output = Command::new("terragrunt")
-        .arg("providers")
-        .arg("schema")
-        .arg("-json")
-        .current_dir(working_dir)
-        .stdout(Stdio::piped())
-        .output()?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "Terragrunt provider schema extraction failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ).into());
+pub fn clean_workspace() {
+    fn remove_dirs_by_name(root: &Path, dir_name: &str) {
+        if let Ok(entries) = fs::read_dir(root) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    if path.file_name().map(|n| n == dir_name).unwrap_or(false) {
+                        let _ = fs::remove_dir_all(&path);
+                    } else {
+                        remove_dirs_by_name(&path, dir_name);
+                    }
+                }
+            }
+        }
     }
 
-    let json = String::from_utf8(output.stdout)?;
-    let file_path = working_dir.join(".terragrunt-provider-schema.json");
-    let mut file = File::create(&file_path)?;
-    file.write_all(json.as_bytes())?;
+    fn remove_files_by_ext(root: &Path, ext: &str) {
+        if let Ok(entries) = fs::read_dir(root) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    remove_files_by_ext(&path, ext);
+                } else if path.extension().map(|e| e == ext).unwrap_or(false) {
+                    let _ = fs::remove_file(&path);
+                }
+            }
+        }
+    }
 
-    println!("✅ Provider schema written to {}", file_path.display());
-    Ok(())
+    fn remove_files_by_pattern(root: &Path, pattern: &str) {
+        if let Ok(entries) = fs::read_dir(root) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    remove_files_by_pattern(&path, pattern);
+                } else if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.ends_with(pattern) {
+                        let _ = fs::remove_file(&path);
+                    }
+                }
+            }
+        }
+    }
+
+    fn remove_files_by_name(root: &Path, file_name: &str) {
+        if let Ok(entries) = fs::read_dir(root) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    remove_files_by_name(&path, file_name);
+                } else if path.file_name().map(|n| n == file_name).unwrap_or(false) {
+                    let _ = fs::remove_file(&path);
+                }
+            }
+        }
+    }
+
+    let root = Path::new(".");
+    remove_dirs_by_name(root, ".terraform");
+    remove_dirs_by_name(root, ".terragrunt-cache");
+    remove_files_by_ext(root, "tfstate");
+    remove_files_by_pattern(root, ".lock.hcl");
+    remove_files_by_name(root, "out.tfplan");
+    remove_files_by_name(Path::new("envs/simulator/dev"), "plan.json");
+    remove_files_by_name(Path::new("envs/simulator/dev"), ".terragrunt-provider-schema.json");
+}
+
+pub fn perform_just_gen() {
+    // Clean
+    clean_workspace();
+
+    // Init
+    let _ = Command::new("terragrunt")
+        .arg("init")
+        .arg("--all")
+        .current_dir("envs/simulator/dev")
+        .output();
+
+    // Plan
+    let _ = Command::new("terragrunt")
+        .arg("run-all")
+        .arg("plan")
+        .arg("-out")
+        .arg("out.tfplan")
+        .current_dir("envs/simulator/dev")
+        .output();
+
+    // Plans-to-JSON
+    if let Ok(entries) = fs::read_dir("envs/simulator/dev/.terragrunt-cache") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Ok(sub_entries) = fs::read_dir(&path) {
+                    for sub_entry in sub_entries.flatten() {
+                        let sub_path = sub_entry.path();
+                        if sub_path.extension().map(|e| e == "tfplan").unwrap_or(false) {
+                            let output = Command::new("terraform")
+                                .arg("-chdir")
+                                .arg(path.to_str().unwrap())
+                                .arg("show")
+                                .arg("-json")
+                                .arg(sub_path.file_name().unwrap().to_str().unwrap())
+                                .output();
+                            if let Ok(output) = output {
+                                let json_path = format!("test/tmp/{}.json", sub_path.file_stem().unwrap().to_str().unwrap());
+                                let _ = fs::write(json_path, output.stdout);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Copy-Plan-JSON
+    if let Ok(entries) = fs::read_dir("envs/simulator/dev/.terragrunt-cache") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Ok(sub_entries) = fs::read_dir(&path) {
+                    for sub_entry in sub_entries.flatten() {
+                        let sub_path = sub_entry.path();
+                        if sub_path.extension().map(|e| e == "json").unwrap_or(false) {
+                            let dest_path = format!("tests/fixtures/{}", sub_path.file_name().unwrap().to_str().unwrap());
+                            let _ = fs::copy(&sub_path, dest_path);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

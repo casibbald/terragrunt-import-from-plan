@@ -130,6 +130,109 @@ google_artifact_registry_repository.remote_repos["mock-repo"]
 }
 ```
 
+## Testing
+
+### Test Stack
+
+The project uses a comprehensive test suite with the following components:
+
+1. **Integration Tests** (`tests/integration_tests.rs`)
+   - 27 tests covering all major functionality
+   - Tests are ordered and named with prefixes (e.g., `test_01_`, `test_02_`) for clear execution order
+   - Includes tests for error cases with clear `[EXPECTED ERROR]` output
+
+2. **Unit Tests** (in respective module files)
+   - Tests for individual components and functions
+   - Located alongside the code they test
+
+### Running Tests
+
+```bash
+# Run all tests
+cargo test
+
+# Run tests with output
+cargo test -- --nocapture
+
+# Run tests in a single thread (recommended for integration tests)
+cargo test -- --test-threads=1
+
+# Run specific test
+cargo test test_name
+```
+
+### Code Coverage
+
+The project uses `cargo-llvm-cov` for code coverage reporting. To generate coverage reports:
+
+```bash
+# Generate HTML coverage report
+cargo llvm-cov --all-features --workspace --html
+
+# Generate coverage report and open in browser
+cargo llvm-cov --all-features --workspace --html --open
+```
+
+Coverage reports are generated in `target/llvm-cov/html/`.
+
+### Test Categories
+
+1. **Resource Collection Tests**
+   - `test_03_collect_resources`
+   - `test_04_collect_all_resources`
+   - `test_05_collect_resources_empty_module`
+
+2. **Schema Tests**
+   - `test_06_extract_id_candidate_fields`
+   - `test_07_extract_id_candidate_fields_empty_schema`
+   - `test_08_extract_id_candidate_fields_missing_provider`
+
+3. **Provider Schema Tests**
+   - `test_09_write_provider_schema`
+   - `test_10_write_provider_schema_invalid_dir`
+   - `test_11_write_provider_schema_readonly_dir`
+   - `test_12_write_provider_schema_basic`
+   - `test_13_write_provider_schema_invalid_output`
+   - `test_14_write_provider_schema_terragrunt_not_found`
+
+4. **ID Candidate Tests**
+   - `test_15_get_id_candidate_fields`
+   - `test_16_get_id_candidate_fields_empty`
+   - `test_17_get_id_candidate_fields_less_than_three`
+
+5. **Provider Schema Loading Tests**
+   - `test_18_load_provider_schema`
+   - `test_19_load_provider_schema_invalid_file`
+   - `test_20_load_provider_schema_invalid_json`
+
+6. **Attribute Scoring Tests**
+   - `test_21_score_attributes_for_id`
+   - `test_22_score_attributes_for_id_empty`
+
+7. **Import Command Tests**
+   - `test_23_generate_import_commands`
+   - `test_24_infer_resource_id`
+   - `test_25_map_resources_to_modules`
+
+8. **Terragrunt Integration Tests**
+   - `test_26_run_terragrunt_import_mock`
+   - `test_27_validate_module_dirs`
+
+### Error Handling
+
+The test suite includes comprehensive error handling tests that:
+- Verify expected error conditions
+- Provide clear error messages with `[EXPECTED ERROR]` prefix
+- Include detailed output (stdout/stderr) for debugging
+- Maintain test isolation and cleanup
+
+## Contributing
+
+When adding new tests:
+1. Follow the existing naming convention (`test_XX_`)
+2. Include error handling tests where appropriate
+3. Add clear error messages for expected failures
+4. Update this documentation with any new test categories
 
 # Contributing
 

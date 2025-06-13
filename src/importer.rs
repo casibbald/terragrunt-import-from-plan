@@ -67,17 +67,17 @@ pub struct Resource {
 #[derive(Debug, Deserialize)]
 pub struct ModuleMeta {
     #[serde(rename = "Key")]
-    pub(crate) key: String,
+    pub key: String,
     #[serde(rename = "Source")]
-    pub(crate) source: String,
+    pub source: String,
     #[serde(rename = "Dir")]
-    pub(crate) dir: String,
+    pub dir: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ModulesFile {
     #[serde(rename = "Modules")]
-    pub(crate) modules: Vec<ModuleMeta>,
+    pub modules: Vec<ModuleMeta>,
 }
 
 
@@ -418,133 +418,3 @@ fn check(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-
-
-    #[test]
-    fn test_validate_module_dirs() {
-        let data = fs::read_to_string("tests/fixtures/modules.json").expect("Unable to read file");
-        let modules_file: ModulesFile = serde_json::from_str(&data).expect("Invalid JSON");
-
-        let errors = validate_module_dirs(&modules_file.modules, Path::new("simulator"));
-
-        assert!(errors.is_empty(), "Found invalid directories: {:?}", errors);
-    }
-
-    #[test]
-    fn test_map_resources_to_modules() {
-        let modules_data = fs::read_to_string("tests/fixtures/modules.json").expect("Unable to read modules file");
-        let plan_data = fs::read_to_string("tests/fixtures/out.json").expect("Unable to read plan file");
-
-        let modules_file: ModulesFile = serde_json::from_str(&modules_data).expect("Invalid modules JSON");
-        let plan: PlanFile = serde_json::from_str(&plan_data).expect("Invalid plan JSON");
-
-        let mapping = map_resources_to_modules(&modules_file.modules, &plan);
-
-        assert!(!mapping.is_empty(), "No resource-module mappings found");
-    }
-
-    #[test]
-    fn test_generate_import_commands() {
-        let modules_data = fs::read_to_string("tests/fixtures/modules.json").expect("Unable to read modules file");
-        let plan_data = fs::read_to_string("tests/fixtures/out.json").expect("Unable to read plan file");
-
-        let modules_file: ModulesFile = serde_json::from_str(&modules_data).expect("Invalid modules JSON");
-        let plan: PlanFile = serde_json::from_str(&plan_data).expect("Invalid plan JSON");
-
-        let mapping = map_resources_to_modules(&modules_file.modules, &plan);
-        let commands = generate_import_commands(&mapping, &plan, ".", true);
-
-        assert!(!commands.is_empty(), "No import commands generated");
-        for cmd in commands {
-            assert!(cmd.starts_with("terragrunt import"), "Command does not start with terraform import: {}", cmd);
-        }
-    }
-
-    #[test]
-    fn test_infer_resource_id() {
-        let plan_data = fs::read_to_string("tests/fixtures/out.json").expect("Unable to read plan file");
-        let plan: PlanFile = serde_json::from_str(&plan_data).expect("Invalid plan JSON");
-        let verbose = true;
-
-        let mut found = false;
-        if let Some(planned_values) = &plan.planned_values {
-            let check = |module: &PlannedModule, found: &mut bool, verbose: bool| {
-                if let Some(resources) = &module.resources {
-                    for resource in resources {
-                        let terraform_resource = TerraformResource {
-                            address: resource.address.clone(),
-                            mode: resource.mode.clone(),
-                            r#type: resource.r#type.clone(),
-                            name: resource.name.clone(),
-                            values: resource.values.clone(),
-                        };
-
-                        let schema_map = plan
-                            .provider_schemas
-                            .as_ref()
-                            .and_then(|ps| ps.provider_schemas.values().next())
-                            .and_then(|provider| provider.resource_schemas.as_ref())
-                            .cloned()
-                            .unwrap_or_default();
-
-                        if let Some(id) = infer_resource_id(&terraform_resource, schema_map.get(&terraform_resource.r#type), verbose) {
-                            println!("Inferred ID for {}: {}", resource.address, id);
-                            *found = true;
-                            return;
-                        }
-                    }
-                }
-                if let Some(children) = &module.child_modules {
-
-                    let schema_map = plan
-                        .provider_schemas
-                        .as_ref()
-                        .and_then(|ps| ps.provider_schemas.values().next())
-                        .and_then(|provider| provider.resource_schemas.as_ref())
-                        .cloned()
-                        .unwrap_or_default();
-                    for child in children {
-                        check(child, found, verbose, &schema_map);
-                    }
-                }
-            };
-            check(&planned_values.root_module, &mut found, verbose);
-        }
-
-        assert!(found, "No resource ID could be inferred");
-    }
-
-    
-    
-
-
-    #[test]
-    fn test_run_terragrunt_import_mock() {
-        // This test validates the command construction without executing terraform.
-        let module_dir = "mock_dir";
-        let resource_address = "mock_resource_address";
-        let resource_id = "mock_resource_id";
-
-        let cmd = Command::new("echo")
-            .arg("terragrunt")
-            .arg("import")
-            .arg("-config-dir")
-            .arg(module_dir)
-            .arg(resource_address)
-            .arg(resource_id)
-            .output()
-            .expect("Failed to simulate terragrunt command");
-
-        let output = String::from_utf8_lossy(&cmd.stdout);
-        assert!(output.contains("terragrunt"));
-        assert!(output.contains(module_dir));
-        assert!(output.contains(resource_address));
-        assert!(output.contains(resource_id));
-    }
-
-
-}

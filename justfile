@@ -13,6 +13,7 @@ run:
     cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/modules --dry-run
 
 gen:
+    just clean
     just init
     just plan
     just plans-to-json
@@ -79,3 +80,7 @@ clean:
     find . -name ".*.lock.hcl" -type f -exec rm -f {} +
     find . -name "out.tfplan" -type f -exec rm -f {} +
     find envs/simulator/dev -name "plan.json" -type f -exec rm -f {} +
+    find envs/simulator/dev -name ".terragrunt-provider-schema.json" -type f -exec rm -f {} +
+
+test:
+    cargo test -- --test-threads=1
