@@ -1,12 +1,9 @@
 use crate::importer::{PlannedModule, Resource};
 use serde_json::Value;
 use std::collections::HashSet;
-use std::fs::File;
-use std::io;
-use std::io::Write;
-use std::path::Path;
-use std::process::{Command, Stdio};
 use std::fs;
+use std::path::Path;
+use std::process::Command;
 use thiserror::Error;
 
 pub use crate::schema::write_provider_schema;

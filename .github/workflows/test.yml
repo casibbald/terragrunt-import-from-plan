@@ -35,26 +35,30 @@ jobs:
         run: sudo apt-get install -y jq
 
       - name: Setup terragrunt
-        uses: metro-digital/cf-github-actions/terragrunt-setup@v1
+        run: |
+          wget -O terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v0.67.16/terragrunt_linux_amd64
+          chmod +x terragrunt
+          sudo mv terragrunt /usr/local/bin/
 
       - name: Install Just
         uses: extractions/setup-just@v3
 
-      - name: Just install
-        uses: extractions/setup-just@v3
-        with:
-          github-token: ${{ secrets.MY_GITHUB_TOKEN }}
-
       - name: Cargo build
-        #run: cargo build --all --all-features # this will also build the example projects, which are currently broken
         run: cargo build
 
+      - name: Initialize test environment
+        run: |
+          cd envs/simulator/dev
+          terragrunt init --terragrunt-non-interactive || echo "Init failed, continuing..."
+          terragrunt run-all plan -out=out.tfplan --terragrunt-non-interactive || echo "Plan failed, continuing..."
+
       - name: Cargo test
-        #run: cargo build --all --all-features # this will also build the example projects, which are currently broken
-        run: cargo test
+        run: cargo test -- --test-threads=1
 
+      - name: Cargo test2
+        run: cargo test -- --test-threads=1  --nocapture
 
-      - name: Dry dry
+      - name: Dry run test
         run: cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/modules --dry-run --working-directory envs/simulator/dev
 #
 #      - name: Run just plan

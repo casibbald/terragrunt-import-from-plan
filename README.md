@@ -6,13 +6,16 @@
 ### 🤔 Why Use This Action?
 
 When running `terragrunt plan`, you may have resources marked for creation but not yet in the Terraform state. This action
-helps you automatically import those resources, ensuring your state file is up-to-date without manual intervention. This
-is particularly useful for CI/CD pipelines where you want to ensure all resources are managed correctly without having
-to run `terraform import` commands manually. It is beneficial in corporate settings where environments use restrictive
-GCP, AWS, or Azure IAM, requiring complex service account impersonation. Often, direct access to import resources is not
-always possible in the local environment, or is tedious to set up, or there are security restrictions from having local
-access to these environments, especially in Production settings. This resource ensures your Terraform state remains
-consistent with the infrastructure, reducing the risk of drift mid-deployment.
+helps you automatically import those resources, ensuring your state file is up-to-date without manual intervention. 
+
+This is particularly useful for CI/CD pipelines where you want to ensure all resources are managed correctly without having
+to run `terraform import` commands manually. 
+
+It is beneficial in corporate settings where environments use restrictive GCP, AWS, or Azure IAM, requiring complex service 
+account impersonation. Often, direct access to import resources is not always possible in the local environment, or is tedious 
+to set up, or there are security restrictions from having local access to these environments, especially in Production settings. 
+
+This resource ensures your Terraform state remains consistent with the infrastructure, reducing the risk of drift mid-deployment.
 
 ### 🚀 Features
 
@@ -267,3 +270,13 @@ This will run a mocked import against a fake `plan.json` and show the correct im
 
 ## 🛡 License
 [MIT](LICENSE)
+
+## Coverage Reports
+
+To generate the LLVM coverage report, run:
+
+```bash
+cargo llvm-cov --html
+```
+
+The coverage report is saved to `target/llvm-cov/html`.

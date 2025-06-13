@@ -1,19 +1,19 @@
+use std::fs;
 use std::path::Path;
 use std::process::Command;
+use serde_json::Value;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum SchemaError {
-    #[error("Failed to run terragrunt: status={status}, stdout={stdout}, stderr={stderr}")]
-    TerragruntError {
-        status: i32,
-        stdout: String,
-        stderr: String,
-    },
-    #[error("Failed to write schema file: {0}")]
-    IoError(#[from] std::io::Error),
-    #[error("Invalid JSON: {0}")]
+    #[error("Failed to run terragrunt command: {0}")]
+    CommandError(#[from] std::io::Error),
+    #[error("Terragrunt command failed with status {status}: stdout={stdout}, stderr={stderr}")]
+    TerragruntError { status: i32, stdout: String, stderr: String },
+    #[error("Failed to parse schema JSON: {0}")]
     JsonError(#[from] serde_json::Error),
+    #[error("Failed to write schema file: {0}")]
+    WriteError(String),
 }
 
 pub fn write_provider_schema(dir: &Path) -> Result<(), SchemaError> {
@@ -22,12 +22,7 @@ pub fn write_provider_schema(dir: &Path) -> Result<(), SchemaError> {
         .arg("schema")
         .arg("-json")
         .current_dir(dir)
-        .output()
-        .map_err(|e| SchemaError::TerragruntError {
-            status: -1,
-            stdout: String::new(),
-            stderr: e.to_string(),
-        })?;
+        .output()?;
 
     if !output.status.success() {
         return Err(SchemaError::TerragruntError {
@@ -37,7 +32,13 @@ pub fn write_provider_schema(dir: &Path) -> Result<(), SchemaError> {
         });
     }
 
+    // Parse the JSON to validate it
+    let _schema_json: Value = serde_json::from_slice(&output.stdout)?;
+
+    // Write the schema to the expected file
     let schema_path = dir.join(".terragrunt-provider-schema.json");
-    std::fs::write(schema_path, output.stdout)?;
+    fs::write(&schema_path, &output.stdout)
+        .map_err(|e| SchemaError::WriteError(format!("Failed to write to {}: {}", schema_path.display(), e)))?;
+
     Ok(())
 } 
