@@ -121,7 +121,8 @@ pub fn map_resources_to_modules<'a>(
                             mapping.insert(resource.address.clone(), module_meta);
                         }
                     } else {
-                        panic!("Unmatched module address: {}", address);
+                        eprintln!("⚠️ Warning: Unmatched module address '{}' - skipping resources in this module", address);
+                        // Continue processing instead of crashing
                     }
                 }
             }
@@ -365,21 +366,33 @@ pub fn run_terragrunt_import(
         ));
     }
 
-    let status = Command::new("terragrunt")
+    let output = Command::new("terragrunt")
         .arg("import")
         .arg(resource_address)
         .arg(resource_id)
         .current_dir(module_path)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()?;
+        .output()?;
 
-    if status.success() {
+    if output.status.success() {
         Ok(())
     } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let error_output = if !stderr.trim().is_empty() {
+            stderr.trim()
+        } else if !stdout.trim().is_empty() {
+            stdout.trim()
+        } else {
+            "No error output captured"
+        };
+        
         Err(io::Error::new(
             io::ErrorKind::Other,
-            format!("Failed to import {}", resource_address),
+            format!("Failed to import {} (exit code: {}): {}", 
+                resource_address, 
+                output.status.code().unwrap_or(-1),
+                error_output
+            ),
         ))
     }
 }
