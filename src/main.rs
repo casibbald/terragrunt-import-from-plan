@@ -1,15 +1,17 @@
 #![feature(let_chains)]
 
 mod app;
+mod commands;
 mod errors;
 mod importer;
 mod plan;
 mod reporting;
 mod schema;
+mod scoring;
 mod utils;
 
 use crate::app::load_input_files;
-use crate::importer::{execute_or_print_imports, generate_import_commands, map_resources_to_modules};
+use crate::importer::{execute_or_print_imports, map_resources_to_modules};
 use crate::utils::{run_terragrunt_init, write_provider_schema};
 use anyhow::{Context, Result};
 use clap::Parser;

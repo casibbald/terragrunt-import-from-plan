@@ -1,8 +1,12 @@
+pub mod manager;
+
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 use serde_json::Value;
 use thiserror::Error;
+
+pub use manager::SchemaManager;
 
 #[derive(Error, Debug)]
 pub enum SchemaError {
