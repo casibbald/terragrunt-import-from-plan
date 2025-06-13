@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::{self};
 use std::path::{Path, PathBuf};
@@ -64,7 +64,7 @@ pub struct Resource {
     pub depends_on: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ModuleMeta {
     #[serde(rename = "Key")]
     pub key: String,
@@ -74,7 +74,7 @@ pub struct ModuleMeta {
     pub dir: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ModulesFile {
     #[serde(rename = "Modules")]
     pub modules: Vec<ModuleMeta>,

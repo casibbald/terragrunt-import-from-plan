@@ -48,9 +48,6 @@ copy-plan-json env=default_env *VARS="":
     done
 
 
-
-
-
 # Apply all modules
 apply env=default_env:
     cd {{terragrunt_dir}}/{{env}} && terragrunt run-all apply

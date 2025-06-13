@@ -8,17 +8,13 @@ mod utils;
 
 use crate::importer::{execute_or_print_imports, generate_import_commands, infer_resource_id, map_resources_to_modules, run_terragrunt_import, ModulesFile, PlanFile};
 use crate::plan::TerraformResource;
-use crate::utils::{collect_resources, run_terragrunt_init, write_provider_schema, perform_just_gen};
+use crate::utils::{collect_resources, run_terragrunt_init, write_provider_schema};
 use clap::Parser;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use std::io::{self, Write};
-use std::collections::HashMap;
-use serde_json::Value;
-use thiserror::Error;
 use tempfile::TempDir;
-use terragrunt_import_from_plan::schema::SchemaError;
+
 
 #[derive(Parser, Debug)]
 #[command(name = "terragrunt_import_from_plan")]
@@ -69,7 +65,7 @@ fn main() {
             eprintln!("⚠️ Warning: terragrunt init failed: {}", e);
             // Continue execution despite the error
         }
-        
+
         if let Err(e) = write_provider_schema(Path::new(args.working_directory.as_deref().unwrap_or("."))) {
             eprintln!("⚠️ Failed to generate provider schema: {}", e);
         }
@@ -134,7 +130,7 @@ fn main() {
 mod tests {
     use super::*;
     use std::sync::Once;
-    use terragrunt_import_from_plan::utils::{collect_resources, run_terragrunt_init, write_provider_schema};
+    use terragrunt_import_from_plan::utils::{run_terragrunt_init, write_provider_schema};
 
     static INIT: Once = Once::new();
 
