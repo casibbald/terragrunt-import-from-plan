@@ -8,7 +8,7 @@ use terragrunt_import_from_plan::importer::{
     validate_module_dirs, map_resources_to_modules, generate_import_commands, infer_resource_id
 };
 use terragrunt_import_from_plan::utils::{
-    collect_resources, collect_all_resources, extract_id_candidate_fields,
+    collect_resources, extract_id_candidate_fields,
     write_provider_schema, perform_just_gen
 };
 use serde_json::json;
@@ -87,15 +87,78 @@ fn test_01_collect_resources() {
 }
 
 #[test]
-fn test_02_collect_all_resources() {
+fn test_02_collect_resources_consolidation() {
     let module = create_test_module();
     let mut resources = Vec::new();
-    collect_all_resources(&module, &mut resources);
+    collect_resources(&module, &mut resources);
     
     assert_eq!(resources.len(), 3);
     assert_eq!(resources[0].address, "test.resource1");
     assert_eq!(resources[1].address, "test.resource2");
     assert_eq!(resources[2].address, "module.child.test.resource3");
+    
+    // Test that it handles nested modules correctly
+    let nested_module = PlannedModule {
+        resources: Some(vec![
+            Resource {
+                address: "root.resource".to_string(),
+                mode: "managed".to_string(),
+                r#type: "test_type".to_string(),
+                name: "root_resource".to_string(),
+                provider_name: None,
+                schema_version: None,
+                values: None,
+                sensitive_values: None,
+                depends_on: None,
+            },
+        ]),
+        child_modules: Some(vec![
+            PlannedModule {
+                resources: Some(vec![
+                    Resource {
+                        address: "child1.resource".to_string(),
+                        mode: "managed".to_string(),
+                        r#type: "test_type".to_string(),
+                        name: "child1_resource".to_string(),
+                        provider_name: None,
+                        schema_version: None,
+                        values: None,
+                        sensitive_values: None,
+                        depends_on: None,
+                    },
+                ]),
+                child_modules: Some(vec![
+                    PlannedModule {
+                        resources: Some(vec![
+                            Resource {
+                                address: "grandchild.resource".to_string(),
+                                mode: "managed".to_string(),
+                                r#type: "test_type".to_string(),
+                                name: "grandchild_resource".to_string(),
+                                provider_name: None,
+                                schema_version: None,
+                                values: None,   
+                                sensitive_values: None,
+                                depends_on: None,
+                            },
+                        ]),
+                        child_modules: None,
+                        address: Some("module.grandchild".to_string()),
+                    },
+                ]),
+                address: Some("module.child1".to_string()),
+            },
+        ]),
+        address: None,
+    };
+    
+    let mut nested_resources = Vec::new();
+    collect_resources(&nested_module, &mut nested_resources);
+    
+    assert_eq!(nested_resources.len(), 3);
+    assert_eq!(nested_resources[0].address, "root.resource");
+    assert_eq!(nested_resources[1].address, "child1.resource");
+    assert_eq!(nested_resources[2].address, "grandchild.resource");
 }
 
 #[test]

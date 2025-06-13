@@ -1,19 +1,20 @@
 #![feature(let_chains)]
 
+mod app;
 mod errors;
 mod importer;
 mod plan;
+mod reporting;
 mod schema;
 mod utils;
 
-use crate::importer::{execute_or_print_imports, generate_import_commands, infer_resource_id, map_resources_to_modules, run_terragrunt_import, ModulesFile, PlanFile};
+use crate::app::load_input_files;
+use crate::importer::{execute_or_print_imports, generate_import_commands, infer_resource_id, map_resources_to_modules, run_terragrunt_import};
 use crate::plan::TerraformResource;
 use crate::utils::{collect_resources, run_terragrunt_init, write_provider_schema};
+use anyhow::{Context, Result};
 use clap::Parser;
-use std::fs;
 use std::path::Path;
-use std::process::Command;
-use tempfile::TempDir;
 
 
 #[derive(Parser, Debug)]
@@ -40,29 +41,19 @@ struct Args {
 }
 
 
-fn load_modules<P: AsRef<Path>>(path: P) -> Result<ModulesFile, Box<dyn std::error::Error>> {
-    let content = fs::read_to_string(path)?;
-    let modules: ModulesFile = serde_json::from_str(&content)?;
-    Ok(modules)
-}
 
-fn load_plan<P: AsRef<Path>>(path: P) -> Result<PlanFile, Box<dyn std::error::Error>> {
-    let content = fs::read_to_string(path)?;
-    let plan: PlanFile = serde_json::from_str(&content)?;
-    Ok(plan)
-}
 
-fn main() {
+fn main() -> Result<()> {
     let args = Args::parse();
 
-    let modules_file = load_modules(&args.modules).expect("Failed to load modules");
-    let plan_file = load_plan(&args.plan).expect("Failed to load plan");
+    let (modules_file, plan_file) = load_input_files(&args.modules, &args.plan)
+        .context("Failed to load input files")?;
     let module_root = args.module_root.clone().unwrap_or_else(|| ".".to_string());
     // let module_root_path = Path::new(&module_root);
 
     // 🌐 Try to extract provider schema if possible
         if let Err(e) = run_terragrunt_init(args.working_directory.as_deref().unwrap_or(".")) {
-            eprintln!("⚠️ Warning: terragrunt init failed: {}", e);
+            eprintln!("⚠️ Warning: terragrunt init failed: {:#}", e);
             // Continue execution despite the error
         }
 
@@ -124,12 +115,16 @@ fn main() {
             }
         }
     }
+    
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
     use std::sync::Once;
+    use tempfile::TempDir;
     use terragrunt_import_from_plan::utils::{run_terragrunt_init, write_provider_schema};
 
     static INIT: Once = Once::new();
@@ -186,5 +181,25 @@ mod tests {
         } else {
             panic!("Expected error");
         }
+    }
+
+    #[test]
+    fn test_12_error_context_formatting() {
+        setup();
+        let temp_dir = TempDir::new().unwrap();
+        let result = run_terragrunt_init(temp_dir.path().to_str().unwrap());
+        assert!(result.is_err());
+        
+        let error_string = format!("{:#}", result.unwrap_err());
+        
+        // Verify the error contains useful context
+        // The error might be about terragrunt command not found rather than execution failure
+        assert!(error_string.contains("terragrunt") && (
+            error_string.contains("Failed to execute") || 
+            error_string.contains("Terragrunt init failed") ||
+            error_string.contains("command not found") ||
+            error_string.contains("No such file")
+        ));
+        assert!(error_string.contains(temp_dir.path().to_str().unwrap()));
     }
 }

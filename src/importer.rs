@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use serde_json::{Map, Value};
 use crate::plan::TerraformResource;
-use crate::utils::{collect_all_resources, collect_resources, extract_id_candidate_fields};
+use crate::reporting::{ImportStats, ImportOperation, print_import_progress, print_import_summary};
+use crate::utils::{collect_resources, extract_id_candidate_fields};
 
 
 #[derive(Debug, Deserialize)]
@@ -265,19 +266,16 @@ pub fn execute_or_print_imports(
     module_root: &str,
 ) {
     if let Some(planned_values) = &plan.planned_values {
-        
-        let mut all_resources = vec![];
-        collect_all_resources(&planned_values.root_module, &mut all_resources);
-
         let mut all_resources = vec![];
         collect_resources(&planned_values.root_module, &mut all_resources);
 
-        let mut imported = 0;
-        let mut skipped = 0;
-        let mut failed = 0;
-        
+        let mut stats = ImportStats::new();
 
         for resource in all_resources {
+            if verbose {
+                print_import_progress(&resource.address, ImportOperation::Checking);
+            }
+
             let terraform_resource = TerraformResource {
                 address: resource.address.clone(),
                 mode: resource.mode.clone(),
@@ -300,54 +298,54 @@ pub fn execute_or_print_imports(
                 verbose,
             );
 
-
             match resource_map.get(&resource.address) {
                 Some(module_meta) => {
                     if let Some(id) = inferred_id {
                         let module_path = PathBuf::from(module_root).join(&module_meta.dir);
+                        
+                        if verbose {
+                            print_import_progress(&resource.address, ImportOperation::Importing { id: id.clone() });
+                        }
+                        
                         if dry_run {
-                            println!(
-                                "🌿 [DRY RUN] terragrunt import -config-dir={} {} {}",
+                            let command = format!(
+                                "terragrunt import -config-dir={} {} {}",
                                 module_path.display(),
                                 resource.address,
                                 id
                             );
-                            imported += 1;
+                            print_import_progress(&resource.address, ImportOperation::DryRun { command });
+                            stats.increment_imported(resource.address.clone());
                         } else {
                             match run_terragrunt_import(&module_path, &resource.address, id) {
                                 Ok(_) => {
-                                    println!("✅ Imported {}", resource.address);
-                                    imported += 1;
+                                    print_import_progress(&resource.address, ImportOperation::Success);
+                                    stats.increment_imported(resource.address.clone());
                                 }
-                                Err(_) => {
-                                    eprintln!(
-                                        "❌ Error importing {}: Module path does not exist: {}",
-                                        resource.address,
-                                        module_path.display()
-                                    );
-                                    failed += 1;
+                                Err(e) => {
+                                    let error_msg = format!("Module path does not exist: {}", module_path.display());
+                                    print_import_progress(&resource.address, ImportOperation::Failed { error: error_msg });
+                                    stats.increment_failed();
                                 }
                             }
                         }
                     } else {
-                        println!("⚠️ Skipped {}: no ID could be inferred", resource.address);
-                        skipped += 1;
+                        print_import_progress(&resource.address, ImportOperation::Skipped { 
+                            reason: "no ID could be inferred".to_string() 
+                        });
+                        stats.increment_skipped();
                     }
                 }
                 None => {
-                    println!(
-                        "⚠️ Skipped {}: no matching module mapping found",
-                        resource.address
-                    );
-                    skipped += 1;
+                    print_import_progress(&resource.address, ImportOperation::Skipped { 
+                        reason: "no matching module mapping found".to_string() 
+                    });
+                    stats.increment_skipped();
                 }
             }
         }
 
-        println!(
-            "\n📦 Import Summary\nImported:   {}\nAlready in state: 0\nSkipped:     {}\nFailed:      {}",
-            imported, skipped, failed
-        );
+        print_import_summary(&stats);
     }
 }
 
