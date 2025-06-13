@@ -323,7 +323,7 @@ pub fn execute_or_print_imports(
                                     stats.increment_imported(resource.address.clone());
                                 }
                                 Err(e) => {
-                                    let error_msg = format!("Module path does not exist: {}", module_path.display());
+                                    let error_msg = format!("Import failed: {}", e);
                                     print_import_progress(&resource.address, ImportOperation::Failed { error: error_msg });
                                     stats.increment_failed();
                                 }
