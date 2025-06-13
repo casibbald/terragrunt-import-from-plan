@@ -1,6 +1,7 @@
 use crate::importer::{PlannedModule, Resource};
 use serde_json::Value;
 use std::collections::HashSet;
+use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -20,28 +21,20 @@ pub enum TerragruntProcessError {
     Io(#[from] std::io::Error),
 }
 
-pub fn collect_resources<'a>(module: &'a PlannedModule, all: &mut Vec<&'a Resource>) {
-    if let Some(res) = &module.resources {
-        all.extend(res.iter());
+/// Collects all resources from a planned module and its child modules recursively.
+/// This is the consolidated function that replaces both collect_resources and collect_all_resources.
+pub fn collect_resources<'a>(module: &'a PlannedModule, resources: &mut Vec<&'a Resource>) {
+    if let Some(module_resources) = &module.resources {
+        resources.extend(module_resources.iter());
     }
     if let Some(children) = &module.child_modules {
         for child in children {
-            collect_resources(child, all);
+            collect_resources(child, resources);
         }
     }
 }
 
 
-pub fn collect_all_resources<'a>(module: &'a PlannedModule, resources: &mut Vec<&'a Resource>) {
-    if let Some(rs) = &module.resources {
-        resources.extend(rs.iter());
-    }
-    if let Some(children) = &module.child_modules {
-        for child in children {
-            collect_all_resources(child, resources);
-        }
-    }
-}
 
 pub fn extract_id_candidate_fields(schema_json: &Value) -> HashSet<String> {
     let mut candidates = HashSet::new();
@@ -66,22 +59,27 @@ pub fn extract_id_candidate_fields(schema_json: &Value) -> HashSet<String> {
     candidates
 }
 
-pub fn run_terragrunt_init(working_directory: &str) -> Result<(), TerragruntProcessError> {
+pub fn run_terragrunt_init(working_directory: &str) -> Result<()> {
     println!("🔧 Running `terragrunt init` in {}", working_directory);
 
     let output = Command::new("terragrunt")
         .arg("init")
         .current_dir(working_directory)
-        .output()?;
+        .output()
+        .with_context(|| format!("Failed to execute terragrunt init in directory: {}", working_directory))?;
 
     if output.status.success() {
         Ok(())
     } else {
-        Err(TerragruntProcessError::ProcessError {
-            status: output.status.code().unwrap_or(-1),
-            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        })
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!(
+            "Terragrunt init failed in {}\nStatus: {}\nStdout: {}\nStderr: {}",
+            working_directory,
+            output.status.code().unwrap_or(-1),
+            stdout.trim(),
+            stderr.trim()
+        );
     }
 }
 
