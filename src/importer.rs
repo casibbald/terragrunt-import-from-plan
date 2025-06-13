@@ -2,12 +2,36 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::{self};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use serde_json::{Map, Value};
 use crate::plan::TerraformResource;
 use crate::reporting::{ImportStats, ImportOperation, print_import_progress, print_import_summary};
 use crate::utils::{collect_resources, extract_id_candidate_fields};
 
+/// Represents a resource that has been processed and has an inferred ID
+#[derive(Debug)]
+pub struct ResourceWithId<'a> {
+    pub resource: &'a Resource,
+    pub terraform_resource: TerraformResource,
+    pub id: String,
+    pub module_meta: &'a ModuleMeta,
+    pub module_path: PathBuf,
+}
+
+/// Result of processing a single resource
+#[derive(Debug)]
+enum ResourceProcessingResult<'a> {
+    ReadyForImport(ResourceWithId<'a>),
+    Skipped { address: String, reason: String },
+}
+
+/// Result of executing an import operation
+#[derive(Debug)]
+enum ImportExecutionResult {
+    Success(String), // address
+    Failed { address: String, error: String },
+    DryRun { address: String, command: String },
+}
 
 #[derive(Debug, Deserialize)]
 pub struct PlanFile {
@@ -259,6 +283,95 @@ pub fn infer_resource_id(
     None
 }
 
+/// Executes an import operation for a resource (either dry-run or real execution)
+fn execute_import_for_resource(resource_with_id: &ResourceWithId, dry_run: bool) -> ImportExecutionResult {
+    if dry_run {
+        let command = format!(
+            "terragrunt import -config-dir={} {} {}",
+            resource_with_id.module_path.display(),
+            resource_with_id.resource.address,
+            resource_with_id.id
+        );
+        ImportExecutionResult::DryRun {
+            address: resource_with_id.resource.address.clone(),
+            command,
+        }
+    } else {
+        match run_terragrunt_import(&resource_with_id.module_path, &resource_with_id.resource.address, resource_with_id.id.clone()) {
+            Ok(_) => ImportExecutionResult::Success(resource_with_id.resource.address.clone()),
+            Err(e) => ImportExecutionResult::Failed {
+                address: resource_with_id.resource.address.clone(),
+                error: format!("Import failed: {}", e),
+            },
+        }
+    }
+}
+
+/// Processes a single resource and determines if it's ready for import or should be skipped
+fn process_single_resource<'a>(
+    resource: &'a Resource,
+    resource_map: &HashMap<String, &'a ModuleMeta>,
+    schema_map: &HashMap<String, Value>,
+    module_root: &str,
+    verbose: bool,
+) -> ResourceProcessingResult<'a> {
+    let terraform_resource = TerraformResource {
+        address: resource.address.clone(),
+        mode: resource.mode.clone(),
+        r#type: resource.r#type.clone(),
+        name: resource.name.clone(),
+        values: resource.values.clone(),
+    };
+
+    let inferred_id = infer_resource_id(
+        &terraform_resource,
+        schema_map.get(&terraform_resource.r#type),
+        verbose,
+    );
+
+    match resource_map.get(&resource.address) {
+        Some(module_meta) => {
+            if let Some(id) = inferred_id {
+                let module_path = PathBuf::from(module_root).join(&module_meta.dir);
+                ResourceProcessingResult::ReadyForImport(ResourceWithId {
+                    resource,
+                    terraform_resource,
+                    id,
+                    module_meta,
+                    module_path,
+                })
+            } else {
+                ResourceProcessingResult::Skipped {
+                    address: resource.address.clone(),
+                    reason: "no ID could be inferred".to_string(),
+                }
+            }
+        }
+        None => ResourceProcessingResult::Skipped {
+            address: resource.address.clone(),
+            reason: "no matching module mapping found".to_string(),
+        },
+    }
+}
+
+/// Collects all resources from a plan and prepares the provider schema map
+fn collect_and_prepare_resources(plan: &PlanFile) -> (Vec<&Resource>, HashMap<String, Value>) {
+    let mut all_resources = vec![];
+    if let Some(planned_values) = &plan.planned_values {
+        collect_resources(&planned_values.root_module, &mut all_resources);
+    }
+
+    let schema_map = plan
+        .provider_schemas
+        .as_ref()
+        .and_then(|ps| ps.provider_schemas.values().next())
+        .and_then(|provider| provider.resource_schemas.as_ref())
+        .cloned()
+        .unwrap_or_default();
+
+    (all_resources, schema_map)
+}
+
 pub fn execute_or_print_imports(
     resource_map: &HashMap<String, &ModuleMeta>,
     plan: &PlanFile,
@@ -266,10 +379,8 @@ pub fn execute_or_print_imports(
     verbose: bool,
     module_root: &str,
 ) {
-    if let Some(planned_values) = &plan.planned_values {
-        let mut all_resources = vec![];
-        collect_resources(&planned_values.root_module, &mut all_resources);
-
+    if let Some(_planned_values) = &plan.planned_values {
+        let (all_resources, schema_map) = collect_and_prepare_resources(plan);
         let mut stats = ImportStats::new();
 
         for resource in all_resources {
@@ -277,70 +388,33 @@ pub fn execute_or_print_imports(
                 print_import_progress(&resource.address, ImportOperation::Checking);
             }
 
-            let terraform_resource = TerraformResource {
-                address: resource.address.clone(),
-                mode: resource.mode.clone(),
-                r#type: resource.r#type.clone(),
-                name: resource.name.clone(),
-                values: resource.values.clone(),
-            };
+            let result = process_single_resource(resource, resource_map, &schema_map, module_root, verbose);
 
-            let schema_map = plan
-                .provider_schemas
-                .as_ref()
-                .and_then(|ps| ps.provider_schemas.values().next())
-                .and_then(|provider| provider.resource_schemas.as_ref())
-                .cloned()
-                .unwrap_or_default();
+            match result {
+                ResourceProcessingResult::ReadyForImport(resource_with_id) => {
+                    if verbose {
+                        print_import_progress(&resource_with_id.resource.address, ImportOperation::Importing { id: resource_with_id.id.clone() });
+                    }
+                    
+                    let execution_result = execute_import_for_resource(&resource_with_id, dry_run);
 
-            let inferred_id = infer_resource_id(
-                &terraform_resource,
-                schema_map.get(&terraform_resource.r#type),
-                verbose,
-            );
-
-            match resource_map.get(&resource.address) {
-                Some(module_meta) => {
-                    if let Some(id) = inferred_id {
-                        let module_path = PathBuf::from(module_root).join(&module_meta.dir);
-                        
-                        if verbose {
-                            print_import_progress(&resource.address, ImportOperation::Importing { id: id.clone() });
+                    match execution_result {
+                        ImportExecutionResult::Success(address) => {
+                            print_import_progress(&address, ImportOperation::Success);
+                            stats.increment_imported(address.clone());
                         }
-                        
-                        if dry_run {
-                            let command = format!(
-                                "terragrunt import -config-dir={} {} {}",
-                                module_path.display(),
-                                resource.address,
-                                id
-                            );
-                            print_import_progress(&resource.address, ImportOperation::DryRun { command });
-                            stats.increment_imported(resource.address.clone());
-                        } else {
-                            match run_terragrunt_import(&module_path, &resource.address, id) {
-                                Ok(_) => {
-                                    print_import_progress(&resource.address, ImportOperation::Success);
-                                    stats.increment_imported(resource.address.clone());
-                                }
-                                Err(e) => {
-                                    let error_msg = format!("Import failed: {}", e);
-                                    print_import_progress(&resource.address, ImportOperation::Failed { error: error_msg });
-                                    stats.increment_failed();
-                                }
-                            }
+                        ImportExecutionResult::Failed { address, error } => {
+                            print_import_progress(&address, ImportOperation::Failed { error });
+                            stats.increment_failed();
                         }
-                    } else {
-                        print_import_progress(&resource.address, ImportOperation::Skipped { 
-                            reason: "no ID could be inferred".to_string() 
-                        });
-                        stats.increment_skipped();
+                                                 ImportExecutionResult::DryRun { address, command } => {
+                             print_import_progress(&address, ImportOperation::DryRun { command });
+                             stats.increment_imported(address.clone());
+                         }
                     }
                 }
-                None => {
-                    print_import_progress(&resource.address, ImportOperation::Skipped { 
-                        reason: "no matching module mapping found".to_string() 
-                    });
+                ResourceProcessingResult::Skipped { address, reason } => {
+                    print_import_progress(&address, ImportOperation::Skipped { reason });
                     stats.increment_skipped();
                 }
             }

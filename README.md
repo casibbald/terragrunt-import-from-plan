@@ -33,7 +33,7 @@ This resource ensures your Terraform state remains consistent with the infrastru
 
 ### 🧪 Included Test Suite
 
-Run `./test/entrypoint_test.sh` to validate logic with mocked input — no infrastructure required.
+Run `cargo test` to validate logic with comprehensive test coverage — no infrastructure required.
 
 ---
 
@@ -135,18 +135,69 @@ google_artifact_registry_repository.remote_repos["mock-repo"]
 
 ## Testing
 
-### Test Stack
+### 🧰 Tech Stack
 
-The project uses a comprehensive test suite with the following components:
+**Core Technology:**
+- **Language**: Rust 2021 Edition
+- **CLI Framework**: `clap` v4 with derive features
+- **JSON Processing**: `serde` and `serde_json` for parsing Terraform plan files
+- **Error Handling**: `anyhow` for error context and `thiserror` for custom error types
+- **File Operations**: `glob` for pattern matching, `tempfile` for testing
+- **Regex**: Advanced pattern matching for resource ID extraction
 
-1. **Integration Tests** (`tests/integration_tests.rs`)
-   - 27 tests covering all major functionality
-   - Tests are ordered and named with prefixes (e.g., `test_01_`, `test_02_`) for clear execution order
-   - Includes tests for error cases with clear `[EXPECTED ERROR]` output
+**Development Tools:**
+- **Testing**: Native Rust testing framework with `cargo test`
+- **Coverage**: `cargo-llvm-cov` for detailed coverage reports
+- **Build System**: Cargo with workspace support
 
-2. **Unit Tests** (in respective module files)
-   - Tests for individual components and functions
-   - Located alongside the code they test
+### 📊 Test Coverage
+
+**Total Tests: 54** ✅
+- **Unit Tests**: 15 tests (module-specific functionality)
+- **Binary Tests**: 21 tests (CLI and integration logic) 
+- **Integration Tests**: 18 tests (end-to-end scenarios)
+
+### Test Categories
+
+#### 1. **Resource Collection Tests** (`test_01` - `test_03`)
+- `test_01_collect_resources` - Basic resource collection from modules
+- `test_02_collect_resources_consolidation` - Nested module resource collection
+- `test_03_collect_resources_empty_module` - Edge case handling for empty modules
+
+#### 2. **Schema Extraction Tests** (`test_04` - `test_06`)
+- `test_04_extract_id_candidate_fields` - Provider schema parsing
+- `test_05_extract_id_candidate_fields_empty_schema` - Empty schema handling
+- `test_06_extract_id_candidate_fields_missing_provider` - Missing provider handling
+
+#### 3. **ID Candidate Field Tests** (`test_07` - `test_09`)
+- `test_07_get_id_candidate_fields` - ID field extraction from schemas
+- `test_08_get_id_candidate_fields_empty` - Empty schema edge cases
+- `test_09_get_id_candidate_fields_less_than_three` - Minimal field scenarios
+
+#### 4. **Provider Schema Tests** (`test_10`)
+- `test_10_load_provider_schema_invalid_file` - Invalid JSON file handling
+
+#### 5. **Attribute Scoring Tests** (`test_11` - `test_12`)
+- `test_11_score_attributes_for_id` - ID field scoring algorithm
+- `test_12_score_attributes_for_id_empty` - Empty attribute handling
+
+#### 6. **Import Command Generation Tests** (`test_13`)
+- `test_13_generate_import_commands` - Terragrunt import command construction
+
+#### 7. **Resource ID Inference Tests** (`test_14`)
+- `test_14_infer_resource_id` - Resource ID inference from plan data
+
+#### 8. **Module Mapping Tests** (`test_15`)
+- `test_15_map_resources_to_modules` - Resource-to-module mapping logic
+
+#### 9. **Terragrunt Integration Tests** (`test_16`)
+- `test_16_run_terragrunt_import_mock` - Mock terragrunt command execution
+
+#### 10. **Module Directory Validation Tests** (`test_17`)
+- `test_17_validate_module_dirs` - Module directory structure validation
+
+#### 11. **Provider Schema Generation Tests** (`test_18`)
+- `test_18_generate_provider_schema_in_real_env` - Real environment schema generation
 
 ### Running Tests
 
@@ -162,6 +213,9 @@ cargo test -- --test-threads=1
 
 # Run specific test
 cargo test test_name
+
+# List all available tests
+cargo test -- --list
 ```
 
 ### Code Coverage
@@ -178,64 +232,23 @@ cargo llvm-cov --all-features --workspace --html --open
 
 Coverage reports are generated in `target/llvm-cov/html/`.
 
-### Test Categories
-
-1. **Resource Collection Tests**
-   - `test_03_collect_resources`
-   - `test_04_collect_all_resources`
-   - `test_05_collect_resources_empty_module`
-
-2. **Schema Tests**
-   - `test_06_extract_id_candidate_fields`
-   - `test_07_extract_id_candidate_fields_empty_schema`
-   - `test_08_extract_id_candidate_fields_missing_provider`
-
-3. **Provider Schema Tests**
-   - `test_09_write_provider_schema`
-   - `test_10_write_provider_schema_invalid_dir`
-   - `test_11_write_provider_schema_readonly_dir`
-   - `test_12_write_provider_schema_basic`
-   - `test_13_write_provider_schema_invalid_output`
-   - `test_14_write_provider_schema_terragrunt_not_found`
-
-4. **ID Candidate Tests**
-   - `test_15_get_id_candidate_fields`
-   - `test_16_get_id_candidate_fields_empty`
-   - `test_17_get_id_candidate_fields_less_than_three`
-
-5. **Provider Schema Loading Tests**
-   - `test_18_load_provider_schema`
-   - `test_19_load_provider_schema_invalid_file`
-   - `test_20_load_provider_schema_invalid_json`
-
-6. **Attribute Scoring Tests**
-   - `test_21_score_attributes_for_id`
-   - `test_22_score_attributes_for_id_empty`
-
-7. **Import Command Tests**
-   - `test_23_generate_import_commands`
-   - `test_24_infer_resource_id`
-   - `test_25_map_resources_to_modules`
-
-8. **Terragrunt Integration Tests**
-   - `test_26_run_terragrunt_import_mock`
-   - `test_27_validate_module_dirs`
-
 ### Error Handling
 
 The test suite includes comprehensive error handling tests that:
-- Verify expected error conditions
-- Provide clear error messages with `[EXPECTED ERROR]` prefix
-- Include detailed output (stdout/stderr) for debugging
-- Maintain test isolation and cleanup
+- Verify expected error conditions with proper error context
+- Provide clear error messages for debugging
+- Include detailed output (stdout/stderr) for troubleshooting
+- Maintain test isolation and proper cleanup
+- Test graceful degradation in environments without cloud access
 
 ## Contributing
 
 When adding new tests:
-1. Follow the existing naming convention (`test_XX_`)
-2. Include error handling tests where appropriate
-3. Add clear error messages for expected failures
+1. Follow the existing naming convention (`test_XX_` with sequential numbering)
+2. Include comprehensive error handling tests where appropriate
+3. Add clear documentation for expected behaviors
 4. Update this documentation with any new test categories
+5. Ensure tests are deterministic and don't require external infrastructure
 
 # Contributing
 
@@ -253,8 +266,6 @@ cargo test
  cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/modules --dry-run
 
 ```
-
-
 
 ## Legacy Bash version
 
