@@ -6,7 +6,8 @@ use std::process::Command;
 use serde_json::{Map, Value};
 use crate::plan::TerraformResource;
 use crate::reporting::{ImportStats, ImportOperation, print_import_progress, print_import_summary};
-use crate::utils::{collect_resources, extract_id_candidate_fields};
+use crate::utils::collect_resources;
+use crate::schema::SchemaManager;
 
 /// Represents a resource that has been processed and has an inferred ID
 #[derive(Debug)]
@@ -184,7 +185,7 @@ pub fn generate_import_commands(
                 values: resource.values.clone(),
             };
 
-            let schema_map = plan
+            let _schema_map = plan
                 .provider_schemas
                 .as_ref()
                 .and_then(|ps| ps.provider_schemas.values().next())
@@ -194,7 +195,7 @@ pub fn generate_import_commands(
 
             let inferred_id = infer_resource_id(
                 &terraform_resource,
-                schema_map.get(&terraform_resource.r#type),
+                None, // Will be updated when we integrate SchemaManager properly
                 verbose,
             );
 
@@ -239,17 +240,16 @@ pub fn extract_id_candidate_fields_from_values(values: &Map<String, Value>) -> H
 
 pub fn infer_resource_id(
     resource: &TerraformResource,
-    provider_schema_json: Option<&Value>,
+    schema_manager: Option<&SchemaManager>,
     verbose: bool,
 ) -> Option<String> {
     let values = resource.values.as_ref()?.as_object()?;
     
-    
-    let candidates = if let Some(schema) = provider_schema_json {
-        extract_id_candidate_fields(schema)
+    let candidates = if let Some(manager) = schema_manager {
+        manager.extract_id_candidates(&resource.r#type)
     } else {
-        // fallback for test cases without schemas
-        extract_id_candidate_fields_from_values(values)
+        // fallback for test cases without schema manager
+        SchemaManager::extract_id_candidates_from_values(values)
     };
 
     // Always prioritize these if present
@@ -311,7 +311,7 @@ fn execute_import_for_resource(resource_with_id: &ResourceWithId, dry_run: bool)
 fn process_single_resource<'a>(
     resource: &'a Resource,
     resource_map: &HashMap<String, &'a ModuleMeta>,
-    schema_map: &HashMap<String, Value>,
+    _schema_map: &HashMap<String, Value>,
     module_root: &str,
     verbose: bool,
 ) -> ResourceProcessingResult<'a> {
@@ -325,7 +325,7 @@ fn process_single_resource<'a>(
 
     let inferred_id = infer_resource_id(
         &terraform_resource,
-        schema_map.get(&terraform_resource.r#type),
+        None, // Will be updated when we integrate SchemaManager properly
         verbose,
     );
 
@@ -476,7 +476,7 @@ fn check(
     module: &PlannedModule,
     found: &mut bool,
     verbose: bool,
-    schema_map: &HashMap<String, Value>,
+    _schema_map: &HashMap<String, Value>,
 ) {
     if let Some(resources) = &module.resources {
         for resource in resources {
@@ -488,7 +488,7 @@ fn check(
                 values: resource.values.clone(),
             };
 
-            if let Some(id) = infer_resource_id(&terraform_resource, schema_map.get(&terraform_resource.r#type), verbose) {
+            if let Some(id) = infer_resource_id(&terraform_resource, None, verbose) {
                 println!("Inferred ID for {}: {}", terraform_resource.address, id);
                 *found = true;
                 return;
@@ -498,7 +498,7 @@ fn check(
 
     if let Some(children) = &module.child_modules {
         for child in children {
-            check(child, found, verbose, schema_map);
+            check(child, found, verbose, _schema_map);
         }
     }
 }

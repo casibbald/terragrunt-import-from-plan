@@ -349,7 +349,7 @@ fn test_14_infer_resource_id() {
                         values: resource.values.clone(),
                     };
 
-                    if let Some(id) = infer_resource_id(&terraform_resource, schema_map.get(&terraform_resource.r#type), verbose) {
+                    if let Some(id) = infer_resource_id(&terraform_resource, None, verbose) {
                         println!("Inferred ID for {}: {}", resource.address, id);
                         *found = true;
                         return;
