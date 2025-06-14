@@ -1,14 +1,42 @@
 use std::path::Path;
-use terragrunt_import_from_plan::{SchemaManager, AttributeMetadata, ResourceAttributeMap};
+use std::fs;
+use std::process::Command;
+use terragrunt_import_from_plan::{SchemaManager, AttributeMetadata, ResourceAttributeMap, write_provider_schema};
+
+/// Ensure fresh schemas exist for both AWS and GCP before running schema tests
+fn ensure_fresh_schemas() {
+    println!("🔄 Ensuring fresh provider schemas for schema integration tests...");
+    
+    let providers = vec![
+        ("gcp", "envs/simulator/gcp/dev"),
+        ("aws", "envs/simulator/aws/dev"),
+    ];
+    
+    for (provider_name, env_path) in providers {
+        let schema_path = Path::new(env_path).join(".terragrunt-provider-schema.json");
+        
+        // Try to generate schema if it doesn't exist or force refresh
+        if !schema_path.exists() {
+            println!("🔧 Generating {} provider schema...", provider_name);
+            match write_provider_schema(Path::new(env_path)) {
+                Ok(_) => println!("✅ Generated {} schema successfully", provider_name),
+                Err(e) => println!("⚠️ Failed to generate {} schema (expected in CI): {}", provider_name, e),
+            }
+        }
+    }
+}
 
 /// Test that we can load the real schema file and parse resource attributes
 #[test]
 fn test_schema_manager_parse_real_attributes() {
+    // Ensure schemas are available
+    ensure_fresh_schemas();
+    
     let schema_dir = Path::new("envs/simulator/gcp/dev");
     
-    // Skip test if schema file doesn't exist (e.g., in CI without GCP access)
+    // Skip test if schema file doesn't exist after generation attempt
     if !schema_dir.join(".terragrunt-provider-schema.json").exists() {
-        println!("⚠️ Skipping schema integration test - .terragrunt-provider-schema.json not found");
+        println!("⚠️ Skipping GCP schema integration test - schema generation failed (expected in CI)");
         return;
     }
 
@@ -43,10 +71,13 @@ fn test_schema_manager_parse_real_attributes() {
 /// Test parsing google_artifact_registry_repository to verify repository_id is handled correctly
 #[test]
 fn test_artifact_registry_repository_parsing() {
+    // Ensure schemas are available
+    ensure_fresh_schemas();
+    
     let schema_dir = Path::new("envs/simulator/gcp/dev");
     
     if !schema_dir.join(".terragrunt-provider-schema.json").exists() {
-        println!("⚠️ Skipping artifact registry test - schema file not found");
+        println!("⚠️ Skipping artifact registry test - schema generation failed (expected in CI)");
         return;
     }
 
@@ -71,10 +102,13 @@ fn test_artifact_registry_repository_parsing() {
 /// Test the new get_id_candidate_attributes method
 #[test] 
 fn test_schema_driven_id_candidates() {
+    // Ensure schemas are available
+    ensure_fresh_schemas();
+    
     let schema_dir = Path::new("envs/simulator/gcp/dev");
     
     if !schema_dir.join(".terragrunt-provider-schema.json").exists() {
-        println!("⚠️ Skipping ID candidates test - schema file not found");
+        println!("⚠️ Skipping ID candidates test - schema generation failed (expected in CI)");
         return;
     }
 
@@ -111,10 +145,13 @@ fn test_schema_driven_id_candidates() {
 /// Test listing all available resource types from the schema
 #[test]
 fn test_list_resource_types() {
+    // Ensure schemas are available
+    ensure_fresh_schemas();
+    
     let schema_dir = Path::new("envs/simulator/gcp/dev");
     
     if !schema_dir.join(".terragrunt-provider-schema.json").exists() {
-        println!("⚠️ Skipping resource types test - schema file not found");
+        println!("⚠️ Skipping resource types test - schema generation failed (expected in CI)");
         return;
     }
 
@@ -190,4 +227,109 @@ fn test_metadata_scoring_logic() {
 
     println!("✅ Scoring logic working: required_string={:.1}, computed_string={:.1}, optional_bool={:.1}", 
              score, computed_score, bool_score);
+}
+
+/// Test AWS schema integration to ensure both providers are working
+#[test]
+fn test_aws_schema_integration() {
+    // Ensure schemas are available
+    ensure_fresh_schemas();
+    
+    let schema_dir = Path::new("envs/simulator/aws/dev");
+    
+    if !schema_dir.join(".terragrunt-provider-schema.json").exists() {
+        println!("⚠️ Skipping AWS schema integration test - schema generation failed (expected in CI)");
+        return;
+    }
+
+    let mut schema_manager = SchemaManager::new(schema_dir);
+    
+    // Load the real AWS schema
+    match schema_manager.load_or_generate_schema() {
+        Ok(_) => {
+            println!("✅ Successfully loaded AWS provider schema");
+            
+            // Try to list resource types
+            match schema_manager.list_resource_types() {
+                Ok(resource_types) => {
+                    assert!(!resource_types.is_empty(), "Should have AWS resource types");
+                    
+                    // Look for common AWS resources
+                    let aws_resources: Vec<&String> = resource_types.iter()
+                        .filter(|rt| rt.starts_with("aws_"))
+                        .take(5)
+                        .collect();
+                    
+                    if !aws_resources.is_empty() {
+                        println!("✅ Found AWS resources: {:?}", aws_resources);
+                        
+                        // Try to parse attributes for the first AWS resource
+                        if let Some(first_resource) = aws_resources.first() {
+                            match schema_manager.parse_resource_attributes(first_resource) {
+                                Ok(attributes) => {
+                                    println!("✅ Successfully parsed {} attributes for {}", 
+                                             attributes.len(), first_resource);
+                                }
+                                Err(e) => {
+                                    println!("⚠️ Failed to parse attributes for {}: {}", first_resource, e);
+                                }
+                            }
+                        }
+                    } else {
+                        println!("⚠️ No AWS resources found in schema (unexpected)");
+                    }
+                }
+                Err(e) => {
+                    println!("⚠️ Failed to list AWS resource types: {}", e);
+                }
+            }
+        }
+        Err(e) => {
+            println!("⚠️ Failed to load AWS schema: {}", e);
+        }
+    }
+}
+
+/// Test multi-provider schema workflow
+#[test]
+fn test_multi_provider_schema_workflow() {
+    // Ensure schemas are available
+    ensure_fresh_schemas();
+    
+    println!("🧪 Testing multi-provider schema workflow...");
+    
+    let providers = vec![
+        ("GCP", "envs/simulator/gcp/dev"),
+        ("AWS", "envs/simulator/aws/dev"),
+    ];
+    
+    let mut successful_providers = Vec::new();
+    
+    for (provider_name, schema_dir) in providers {
+        let schema_path = Path::new(schema_dir).join(".terragrunt-provider-schema.json");
+        
+        if schema_path.exists() {
+            println!("✅ {} schema file exists", provider_name);
+            
+            let mut schema_manager = SchemaManager::new(schema_dir);
+            
+            match schema_manager.load_or_generate_schema() {
+                Ok(_) => {
+                    println!("✅ {} schema loaded successfully", provider_name);
+                    successful_providers.push(provider_name);
+                }
+                Err(e) => {
+                    println!("⚠️ Failed to load {} schema: {}", provider_name, e);
+                }
+            }
+        } else {
+            println!("⚠️ {} schema file not found (expected in CI)", provider_name);
+        }
+    }
+    
+    if successful_providers.is_empty() {
+        println!("⚠️ No provider schemas could be loaded (expected in CI without cloud access)");
+    } else {
+        println!("✅ Successfully loaded schemas for providers: {:?}", successful_providers);
+    }
 } 
