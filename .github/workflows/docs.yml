@@ -1,0 +1,22 @@
+name: Documentation Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Build documentation
+      run: cargo doc --no-deps --document-private-items
+      
+    - name: Check for broken links
+      run: cargo doc --no-deps --document-private-items 2>&1 | grep -i "warning\|error" && exit 1 || echo "Documentation built successfully" 

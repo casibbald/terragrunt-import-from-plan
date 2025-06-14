@@ -1,3 +1,30 @@
+//! # Integration Tests for Terragrunt Import Tool
+//! 
+//! This module contains comprehensive integration tests for the terragrunt import tool.
+//! The tests verify end-to-end functionality including resource collection, ID inference,
+//! command generation, and provider schema handling across multiple cloud providers.
+//! 
+//! ## Test Categories
+//! 
+//! - **Resource Collection Tests**: Verify recursive resource collection from terraform modules
+//! - **Schema Processing Tests**: Test provider schema loading and ID candidate extraction
+//! - **Import Command Tests**: Validate terragrunt import command generation
+//! - **Module Mapping Tests**: Test mapping of resources to their corresponding modules
+//! - **Provider Schema Tests**: Test schema generation for AWS, GCP, and Azure
+//! - **Multi-Cloud Tests**: Verify functionality across different cloud providers
+//! 
+//! ## Test Setup
+//! 
+//! Tests use real fixture files and may attempt to generate fresh provider schemas.
+//! They are designed to be CI-friendly and continue execution even when cloud 
+//! credentials are not available.
+//! 
+//! ## Fixture Files
+//! 
+//! Tests rely on fixture files in `tests/fixtures/{provider}/` containing:
+//! - `modules.json`: Module metadata from terragrunt
+//! - `out.json`: Terraform plan in JSON format
+
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -18,6 +45,10 @@ use terragrunt_import_from_plan::plan::TerraformResource;
 
 static INIT: Once = Once::new();
 
+/// **TEST HELPER** - Basic test initialization
+/// 
+/// Provides one-time setup for the test suite. This is kept minimal as most
+/// setup is handled by the more comprehensive `setup_fresh_provider_schemas()`.
 fn setup() {
     INIT.call_once(|| {
         // Note: Legacy setup replaced with more robust setup_fresh_provider_schemas()
@@ -26,8 +57,24 @@ fn setup() {
     });
 }
 
-/// Setup function that ensures fresh provider schemas for both AWS and GCP
-/// This runs the full workflow: clean, init, plan, and schema generation
+/// **TEST HELPER** - Comprehensive provider schema setup for integration tests
+/// 
+/// This function performs a complete workflow to ensure fresh provider schemas
+/// are available for testing. It's designed to be fault-tolerant and continues
+/// execution even when cloud credentials are not available (e.g., in CI).
+/// 
+/// # Workflow
+/// 1. Clean existing cache and schema files
+/// 2. Run terragrunt init (may fail in CI)
+/// 3. Run terragrunt plan (may fail in CI)  
+/// 4. Generate provider schema files
+/// 
+/// # Returns
+/// Result indicating overall success, but individual provider failures are logged
+/// rather than causing test failures.
+/// 
+/// # Used By
+/// Integration tests that require real provider schema information
 fn setup_fresh_provider_schemas() -> Result<(), Box<dyn std::error::Error>> {
     println!("🔄 Setting up fresh provider schemas for both AWS and GCP...");
     
@@ -121,7 +168,16 @@ fn setup_fresh_provider_schemas() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// Helper function to create a test module structure
+/// **TEST HELPER** - Creates a mock terraform module structure for testing
+/// 
+/// Generates a PlannedModule with a known structure containing:
+/// - 2 root-level resources
+/// - 1 child module with 1 resource
+/// 
+/// This provides predictable test data for resource collection and mapping tests.
+/// 
+/// # Returns
+/// PlannedModule with test resources and child modules
 fn create_test_module() -> PlannedModule {
     PlannedModule {
         resources: Some(vec![
@@ -171,6 +227,11 @@ fn create_test_module() -> PlannedModule {
     }
 }
 
+/// **TEST** - Verifies basic resource collection from a planned module
+/// 
+/// Tests that the `collect_resources` function correctly extracts all resources
+/// from a module hierarchy, including resources in child modules. This is a
+/// fundamental operation for the import workflow.
 #[test]
 fn test_01_collect_resources() {
     let module = create_test_module();
@@ -183,6 +244,11 @@ fn test_01_collect_resources() {
     assert_eq!(resources[2].address, "module.child.test.resource3");
 }
 
+/// **TEST** - Verifies resource collection handles nested module hierarchies
+/// 
+/// Tests resource collection with deeply nested modules (grandchild level)
+/// to ensure the recursive collection algorithm works correctly with
+/// complex module structures.
 #[test]
 fn test_02_collect_resources_consolidation() {
     let module = create_test_module();
@@ -258,6 +324,10 @@ fn test_02_collect_resources_consolidation() {
     assert_eq!(nested_resources[2].address, "grandchild.resource");
 }
 
+/// **TEST** - Verifies resource collection handles empty modules gracefully
+/// 
+/// Tests that the collection function properly handles modules with no
+/// resources or child modules without failing or returning unexpected results.
 #[test]
 fn test_03_collect_resources_empty_module() {
     let module = PlannedModule {
@@ -270,6 +340,11 @@ fn test_03_collect_resources_empty_module() {
     assert!(resources.is_empty());
 }
 
+/// **TEST** - Verifies ID candidate field extraction from provider schema
+/// 
+/// Tests the extraction of potential ID candidate fields from a provider schema
+/// JSON structure. This is used as a fallback when more sophisticated schema
+/// analysis isn't available.
 #[test]
 fn test_04_extract_id_candidate_fields() {
     let schema_json = json!({
@@ -296,6 +371,10 @@ fn test_04_extract_id_candidate_fields() {
     assert!(candidates.contains("project"));
 }
 
+/// **TEST** - Verifies ID extraction handles empty schema gracefully
+/// 
+/// Tests that the ID candidate extraction function returns an empty set
+/// when provided with an empty or invalid schema structure.
 #[test]
 fn test_05_extract_id_candidate_fields_empty_schema() {
     let schema_json = json!({});
@@ -303,6 +382,10 @@ fn test_05_extract_id_candidate_fields_empty_schema() {
     assert!(candidates.is_empty());
 }
 
+/// **TEST** - Verifies ID extraction handles missing provider section
+/// 
+/// Tests that the function gracefully handles schemas with a provider_schemas
+/// section but no actual provider definitions.
 #[test]
 fn test_06_extract_id_candidate_fields_missing_provider() {
     let schema_json = json!({
@@ -312,6 +395,10 @@ fn test_06_extract_id_candidate_fields_missing_provider() {
     assert!(candidates.is_empty());
 }
 
+/// **TEST** - Additional verification of ID candidate field extraction
+/// 
+/// Duplicate test to ensure robustness of the ID extraction functionality
+/// with a standard provider schema structure.
 #[test]
 fn test_07_get_id_candidate_fields() {
     let schema_json = json!({
@@ -338,6 +425,10 @@ fn test_07_get_id_candidate_fields() {
     assert!(candidates.contains("project"));
 }
 
+/// **TEST** - Verifies handling of completely empty schema JSON
+/// 
+/// Tests that the function correctly returns an empty result when given
+/// a completely empty JSON object.
 #[test]
 fn test_08_get_id_candidate_fields_empty() {
     let schema_json = json!({});
@@ -345,6 +436,10 @@ fn test_08_get_id_candidate_fields_empty() {
     assert!(candidates.is_empty());
 }
 
+/// **TEST** - Verifies handling of schemas with minimal attributes
+/// 
+/// Tests that the function correctly extracts candidates even when only
+/// a single attribute is present in the schema.
 #[test]
 fn test_09_get_id_candidate_fields_less_than_three() {
     let schema_json = json!({
@@ -368,6 +463,10 @@ fn test_09_get_id_candidate_fields_less_than_three() {
     assert_eq!(candidates.len(), 1);
 }
 
+/// **TEST** - Verifies error handling for invalid provider schema files
+/// 
+/// Tests that the provider schema loading function properly handles invalid
+/// JSON files and returns appropriate errors rather than panicking.
 #[test]
 fn test_10_load_provider_schema_invalid_file() {
     let temp_dir = TempDir::new().unwrap();
@@ -377,6 +476,10 @@ fn test_10_load_provider_schema_invalid_file() {
     assert!(result.is_err());
 }
 
+/// **TEST** - Additional verification of attribute scoring for ID candidates
+/// 
+/// Another test focusing on the attribute scoring functionality to ensure
+/// consistent behavior across different test scenarios.
 #[test]
 fn test_11_score_attributes_for_id() {
     let schema_json = json!({
@@ -403,6 +506,10 @@ fn test_11_score_attributes_for_id() {
     assert!(candidates.contains("project"));
 }
 
+/// **TEST** - Verifies attribute scoring with empty schema
+/// 
+/// Tests that attribute scoring correctly handles empty schemas and
+/// returns an empty result set.
 #[test]
 fn test_12_score_attributes_for_id_empty() {
     let schema_json = json!({});
@@ -410,6 +517,11 @@ fn test_12_score_attributes_for_id_empty() {
     assert!(candidates.is_empty());
 }
 
+/// **TEST** - Verifies terragrunt import command generation using real fixtures
+/// 
+/// This test uses actual fixture files (modules.json and plan.json) to verify
+/// that the complete command generation workflow produces valid terragrunt
+/// import commands. This is a critical integration test.
 #[test]
 fn test_13_generate_import_commands() {
     let modules_data = fs::read_to_string("tests/fixtures/gcp/modules.json").expect("Unable to read modules file");
@@ -427,6 +539,11 @@ fn test_13_generate_import_commands() {
     }
 }
 
+/// **TEST** - Verifies resource ID inference using real plan data
+/// 
+/// Tests the core ID inference functionality using actual terraform plan data.
+/// This verifies that the tool can successfully identify resource IDs from
+/// real terraform resource configurations.
 #[test]
 fn test_14_infer_resource_id() {
     let plan_data = fs::read_to_string("tests/fixtures/gcp/out.json").expect("Unable to read plan file");
@@ -435,6 +552,7 @@ fn test_14_infer_resource_id() {
 
     let mut found = false;
     if let Some(planned_values) = &plan.planned_values {
+        /// Internal helper function to recursively check modules for inferable IDs
         fn check(module: &PlannedModule, found: &mut bool, verbose: bool, schema_map: &HashMap<String, Value>) {
             if let Some(resources) = &module.resources {
                 for resource in resources {
@@ -474,6 +592,11 @@ fn test_14_infer_resource_id() {
     assert!(found, "No resource ID could be inferred");
 }
 
+/// **TEST** - Verifies resource-to-module mapping using real fixture data
+/// 
+/// Tests the mapping functionality that associates each terraform resource
+/// with its corresponding terragrunt module. This is essential for knowing
+/// which directory to run terragrunt import commands in.
 #[test]
 fn test_15_map_resources_to_modules() {
     let modules_data = fs::read_to_string("tests/fixtures/gcp/modules.json").expect("Unable to read modules file");
@@ -487,6 +610,11 @@ fn test_15_map_resources_to_modules() {
     assert!(!mapping.is_empty(), "No resource-module mappings found");
 }
 
+/// **TEST** - Validates terragrunt import command structure without execution
+/// 
+/// This test verifies that the command construction logic produces valid
+/// command strings without actually executing terragrunt commands. Uses
+/// echo to simulate command execution.
 #[test]
 fn test_16_run_terragrunt_import_mock() {
     // This test validates the command construction without executing terraform.

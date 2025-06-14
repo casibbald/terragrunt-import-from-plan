@@ -45,3 +45,4 @@ plan.tf
 /target
 */*/*/*/.terragrunt-provider-schema.json
 envs/simulator/aws/dev/.terragrunt-provider-schema.json
+*.log
