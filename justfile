@@ -91,7 +91,8 @@ init-safe cloud=default_cloud env=default_env:
     cargo run -- init {{cloud}} --env {{env}} --safe
 
 # Run tests with fresh provider schemas for all cloud providers (AWS, GCP, Azure)
-test-with-fresh-schemas:
+test-all:
+    cargo build
     cargo run -- clean gcp
     cargo run -- clean aws
     cargo run -- clean azure
@@ -101,7 +102,7 @@ test-with-fresh-schemas:
     cargo run -- plan gcp --safe
     cargo run -- plan aws --safe
     cargo run -- plan azure --safe
-    cargo test -- --test-threads=1
+    cargo test -- --test-threads=1 -- --nocapture
 
 # Multi-cloud convenience commands
 run-gcp:

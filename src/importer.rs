@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::io::{self};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::io;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use crate::plan::TerraformResource;
 use crate::reporting::{ImportStats, ImportOperation, print_import_progress, print_import_summary};
@@ -106,8 +106,7 @@ pub struct ModulesFile {
     pub modules: Vec<ModuleMeta>,
 }
 
-
-
+#[allow(dead_code)]
 pub fn validate_module_dirs<P: AsRef<Path>>(
     modules: &[ModuleMeta],
     module_root: P,
@@ -124,7 +123,6 @@ pub fn validate_module_dirs<P: AsRef<Path>>(
         })
         .collect()
 }
-
 
 pub fn map_resources_to_modules<'a>(
     modules: &'a [ModuleMeta],
@@ -164,6 +162,7 @@ pub fn map_resources_to_modules<'a>(
     mapping
 }
 
+#[allow(dead_code)]
 pub fn generate_import_commands(
     resource_map: &HashMap<String, &ModuleMeta>,
     plan: &PlanFile,
@@ -223,9 +222,9 @@ pub fn generate_import_commands(
     commands
 }
 
-
 /// Fallback when no provider schema is available.
 /// Scores likely identifier fields based on naming heuristics.
+#[allow(dead_code)]
 pub fn extract_id_candidate_fields_from_values(values: &Map<String, Value>) -> HashSet<String> {
     let mut fields = HashSet::new();
 
@@ -407,10 +406,10 @@ pub fn execute_or_print_imports(
                             print_import_progress(&address, ImportOperation::Failed { error });
                             stats.increment_failed();
                         }
-                                                 ImportExecutionResult::DryRun { address, command } => {
-                             print_import_progress(&address, ImportOperation::DryRun { command });
-                             stats.increment_imported(address.clone());
-                         }
+                        ImportExecutionResult::DryRun { address, command } => {
+                            print_import_progress(&address, ImportOperation::DryRun { command });
+                            stats.increment_imported(address.clone());
+                        }
                     }
                 }
                 ResourceProcessingResult::Skipped { address, reason } => {
@@ -423,10 +422,6 @@ pub fn execute_or_print_imports(
         print_import_summary(&stats);
     }
 }
-
-
-
-
 
 pub fn run_terragrunt_import(
     module_path: &Path,
@@ -470,7 +465,6 @@ pub fn run_terragrunt_import(
         ))
     }
 }
-
 
 fn check(
     module: &PlannedModule,
