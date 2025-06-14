@@ -331,7 +331,7 @@ pub fn generate_import_commands(
 
             let inferred_id = infer_resource_id(
                 &terraform_resource,
-                None, // Will be updated when we integrate SchemaManager properly
+                None, // Schema manager not available in test utility (use main workflow instead)
                 verbose,
             );
 
@@ -385,16 +385,53 @@ pub fn extract_id_candidate_fields_from_values(values: &Map<String, Value>) -> H
 /// Infers the most likely ID for a resource based on its attributes
 /// 
 /// This function analyzes a resource's attributes to determine the best candidate
-/// for use as an import ID. It prioritizes certain well-known fields and uses
-/// schema information when available.
+/// for use as an import ID. It uses schema-driven intelligence when available,
+/// falling back to hardcoded heuristics for backward compatibility.
 /// 
 /// # Arguments
 /// * `resource` - The terraform resource to analyze
-/// * `schema_manager` - Optional schema manager for advanced analysis
+/// * `schema_manager` - Optional schema manager for schema-driven intelligent analysis
 /// * `verbose` - Whether to print debug information about the selection process
 /// 
 /// # Returns
 /// The inferred ID string if one could be determined, None otherwise
+/// 
+/// # Schema-Driven Intelligence
+/// When a SchemaManager is provided, this function uses intelligent scoring based on:
+/// - **Attribute Metadata**: Required, computed, optional fields from terraform schema
+/// - **Type Analysis**: String types preferred for human-readable IDs
+/// - **Resource-Specific Logic**: Special handling for known resource types
+/// - **Score-Based Ranking**: Attributes ranked by calculated relevance scores
+/// 
+/// # Fallback Behavior
+/// Without a SchemaManager, falls back to hardcoded priority order for backward compatibility.
+/// 
+/// # Examples
+/// ```no_run
+/// use terragrunt_import_from_plan::importer::infer_resource_id;
+/// use terragrunt_import_from_plan::plan::TerraformResource;
+/// use terragrunt_import_from_plan::schema::SchemaManager;
+/// use serde_json::json;
+/// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let resource = TerraformResource {
+///     address: "google_storage_bucket.example".to_string(),
+///     mode: "managed".to_string(),
+///     r#type: "google_storage_bucket".to_string(),
+///     name: "example".to_string(),
+///     values: Some(json!({"name": "my-bucket", "location": "us-central1"})),
+/// };
+/// 
+/// // Schema-driven approach (preferred)
+/// let mut schema_manager = SchemaManager::new("./envs/gcp/dev");
+/// schema_manager.load_or_generate_schema()?;
+/// let id = infer_resource_id(&resource, Some(&schema_manager), true);
+/// 
+/// // Fallback approach
+/// let id_fallback = infer_resource_id(&resource, None, false);
+/// # Ok(())
+/// # }
+/// ```
 pub fn infer_resource_id(
     resource: &TerraformResource,
     schema_manager: Option<&SchemaManager>,
@@ -402,41 +439,77 @@ pub fn infer_resource_id(
 ) -> Option<String> {
     let values = resource.values.as_ref()?.as_object()?;
     
-    let candidates = if let Some(manager) = schema_manager {
-        manager.extract_id_candidates(&resource.r#type)
-    } else {
-        // fallback for test cases without schema manager
-        SchemaManager::extract_id_candidates_from_values(values)
-    };
-
-    // Always prioritize these if present
+    if let Some(manager) = schema_manager {
+        // ✨ NEW: Use schema-driven intelligent scoring
+        match manager.get_id_candidate_attributes(&resource.r#type) {
+            Ok(candidates) => {
+                if verbose {
+                    println!("🧠 [{}] Using schema-driven ID inference", resource.address);
+                    for (name, metadata) in candidates.iter().take(5) {
+                        println!("  📊 {} (score: {:.1}, required: {}, computed: {})", 
+                                name, metadata.calculate_base_score(), metadata.required, metadata.computed);
+                    }
+                }
+                
+                // Try candidates in score order (highest first)
+                for (attr_name, _metadata) in candidates {
+                    if let Some(val) = values.get(&attr_name) {
+                        if let Some(s) = val.as_str() {
+                            if verbose {
+                                println!("✅ [{}] Selected schema-driven ID: {} = '{}'", 
+                                        resource.address, attr_name, s);
+                            }
+                            return Some(s.to_string());
+                        }
+                    }
+                }
+                
+                if verbose {
+                    println!("⚠️ [{}] Schema-driven candidates found but no string values available", resource.address);
+                }
+            }
+            Err(e) => {
+                if verbose {
+                    println!("⚠️ [{}] Schema analysis failed: {}, falling back to hardcoded approach", resource.address, e);
+                }
+            }
+        }
+    }
+    
+    // Fallback to hardcoded approach (for backward compatibility or when schema fails)
     let priority_order = vec!["id", "name", "bucket", "self_link", "project"];
     let mut ranked_candidates = priority_order
         .iter()
         .filter_map(|&field| values.get(field).map(|v| (field, v)))
         .collect::<Vec<_>>();
 
-    // Then add remaining fields from the schema
+    // Add remaining fields that aren't in priority order
     for (key, val) in values {
-        if candidates.contains(key) && !priority_order.contains(&key.as_str()) {
+        if !priority_order.contains(&key.as_str()) {
             ranked_candidates.push((key, val));
         }
     }
 
-    if verbose {
-        println!(
-            "🔍 [{}] Ranked ID candidates: {:?}",
-            resource.address,
-            ranked_candidates.iter().map(|(k, _)| *k).collect::<Vec<_>>()
+    if verbose && schema_manager.is_none() {
+        println!("🔍 [{}] Using fallback hardcoded approach. Candidates: {:?}",
+                resource.address,
+                ranked_candidates.iter().map(|(k, _)| *k).collect::<Vec<_>>()
         );
     }
 
-    for (_, val) in ranked_candidates {
+    for (field_name, val) in ranked_candidates {
         if let Some(s) = val.as_str() {
+            if verbose {
+                println!("✅ [{}] Selected fallback ID: {} = '{}'", 
+                        resource.address, field_name, s);
+            }
             return Some(s.to_string());
         }
     }
 
+    if verbose {
+        println!("❌ [{}] No suitable ID field found", resource.address);
+    }
     None
 }
 
@@ -477,12 +550,13 @@ fn execute_import_for_resource(resource_with_id: &ResourceWithId, dry_run: bool)
 /// Processes a single resource and determines if it's ready for import or should be skipped
 /// 
 /// This internal function analyzes a resource to determine if it can be imported.
-/// It checks for module mapping, attempts ID inference, and returns the appropriate result.
+/// It checks for module mapping, attempts ID inference using schema-driven intelligence,
+/// and returns the appropriate result.
 /// 
 /// # Arguments
 /// * `resource` - The resource to process
 /// * `resource_map` - Mapping of resources to modules
-/// * `_schema_map` - Provider schema information (currently unused)
+/// * `schema_manager` - Schema manager for intelligent ID inference
 /// * `module_root` - Root directory for module paths
 /// * `verbose` - Whether to print verbose output
 /// 
@@ -491,7 +565,7 @@ fn execute_import_for_resource(resource_with_id: &ResourceWithId, dry_run: bool)
 fn process_single_resource<'a>(
     resource: &'a Resource,
     resource_map: &HashMap<String, &'a ModuleMeta>,
-    _schema_map: &HashMap<String, Value>,
+    schema_manager: Option<&SchemaManager>,
     module_root: &str,
     verbose: bool,
 ) -> ResourceProcessingResult<'a> {
@@ -505,7 +579,7 @@ fn process_single_resource<'a>(
 
     let inferred_id = infer_resource_id(
         &terraform_resource,
-        None, // Will be updated when we integrate SchemaManager properly
+        schema_manager, // ✅ Now uses schema-driven intelligence
         verbose,
     );
 
@@ -565,7 +639,7 @@ fn collect_and_prepare_resources(plan: &PlanFile) -> (Vec<&Resource>, HashMap<St
 /// 
 /// This is the primary function used by the application to process a full Terraform plan
 /// and either execute import commands or print them in dry-run mode. It handles the complete
-/// workflow from resource discovery to import execution/simulation.
+/// workflow from resource discovery to import execution/simulation with schema-driven intelligence.
 /// 
 /// # Arguments
 /// * `resource_map` - Mapping of resource addresses to their module metadata
@@ -573,23 +647,53 @@ fn collect_and_prepare_resources(plan: &PlanFile) -> (Vec<&Resource>, HashMap<St
 /// * `dry_run` - If true, only print commands without executing them
 /// * `verbose` - Whether to print detailed progress information
 /// * `module_root` - Root directory for resolving module paths
+/// * `working_directory` - Directory containing terragrunt configuration for schema loading
+/// 
+/// # Schema-Driven Intelligence
+/// This function attempts to load provider schema for intelligent ID inference. If schema
+/// loading fails, it gracefully falls back to hardcoded heuristics for backward compatibility.
 pub fn execute_or_print_imports(
     resource_map: &HashMap<String, &ModuleMeta>,
     plan: &PlanFile,
     dry_run: bool,
     verbose: bool,
     module_root: &str,
+    working_directory: Option<&str>,
 ) {
     if let Some(_planned_values) = &plan.planned_values {
-        let (all_resources, schema_map) = collect_and_prepare_resources(plan);
+        let (all_resources, _schema_map) = collect_and_prepare_resources(plan);
         let mut stats = ImportStats::new();
+
+        // ✨ NEW: Attempt to load schema for intelligent ID inference
+        let schema_manager = if let Some(work_dir) = working_directory {
+            let mut manager = SchemaManager::new(work_dir);
+            match manager.load_or_generate_schema() {
+                Ok(_) => {
+                    if verbose {
+                        println!("✅ Loaded provider schema for intelligent ID inference");
+                    }
+                    Some(manager)
+                }
+                Err(e) => {
+                    if verbose {
+                        println!("⚠️ Schema loading failed, using fallback approach: {}", e);
+                    }
+                    None
+                }
+            }
+        } else {
+            if verbose {
+                println!("⚠️ No working directory provided, using fallback ID inference");
+            }
+            None
+        };
 
         for resource in all_resources {
             if verbose {
                 print_import_progress(&resource.address, ImportOperation::Checking);
             }
 
-            let result = process_single_resource(resource, resource_map, &schema_map, module_root, verbose);
+            let result = process_single_resource(resource, resource_map, schema_manager.as_ref(), module_root, verbose);
 
             match result {
                 ResourceProcessingResult::ReadyForImport(resource_with_id) => {

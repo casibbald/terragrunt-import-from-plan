@@ -290,7 +290,7 @@ fn main() -> Result<()> {
             setup_provider_schema(args.working_directory.as_deref())?;
             
             let mapping = map_resources_to_modules(&modules_file.modules, &plan_file);
-            execute_or_print_imports(&mapping, &plan_file, args.dry_run, args.verbose, &module_root);
+            execute_or_print_imports(&mapping, &plan_file, args.dry_run, args.verbose, &module_root, args.working_directory.as_deref());
             
             Ok(())
         }
