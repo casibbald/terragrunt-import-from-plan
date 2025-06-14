@@ -486,13 +486,15 @@ pub fn generate_fixtures(provider: &str) -> Result<()> {
     let cache_path = format!("{}/.terragrunt-cache", env_path);
     generate_modules_json(provider, &cache_path)?;
     
-    if !plan_output.status.success() {
+    // Always try to find and convert existing .tfplan files first
+    // This handles cases where plan failed but we have tfplan files from previous runs
+    if let Ok(()) = generate_plan_json(provider, &cache_path) {
+        // Successfully found and converted .tfplan files
+    } else if !plan_output.status.success() {
         let stderr = String::from_utf8_lossy(&plan_output.stderr);
         eprintln!("⚠️ Warning: terragrunt plan failed for {}: {}", provider, stderr);
-        // Create minimal plan file since plan failed
+        // Only create minimal plan file if we couldn't find any .tfplan files AND plan failed
         create_minimal_plan_json(provider)?;
-    } else {
-        generate_plan_json(provider, &cache_path)?;
     }
 
     println!("✅ Fixtures generated successfully for {} provider", provider);
@@ -634,14 +636,9 @@ fn generate_plan_json(provider: &str, cache_path: &str) -> Result<()> {
         }
     }
     
-    // If no plan file found or conversion failed, create a minimal out.json
-    let minimal_plan = r#"{"format_version":"1.2","terraform_version":"1.9.8","planned_values":{"root_module":{"child_modules":[]}}}"#;
-    let fixtures_dir = format!("tests/fixtures/{}", provider);
-    fs::create_dir_all(&fixtures_dir)?;
-    fs::write(format!("{}/out.json", fixtures_dir), minimal_plan)?;
-    println!("⚠️ Created minimal out.json for {} provider (plan conversion failed)", provider);
-    
-    Ok(())
+    // If no plan file found or conversion failed, return an error
+    // Let the caller decide whether to create minimal JSON
+    anyhow::bail!("No .tfplan files found in {} or conversion failed", cache_path)
 }
 
 /// Validates terraform formatting for a provider's configuration
