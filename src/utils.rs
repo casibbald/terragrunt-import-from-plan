@@ -380,9 +380,10 @@ fn create_minimal_plan_json(provider: &str) -> Result<()> {
 /// This function performs a complete workflow to generate test fixtures including:
 /// 1. Cleaning the workspace
 /// 2. Running terragrunt init
-/// 3. Running terragrunt plan
-/// 4. Generating modules.json
-/// 5. Converting plan files to JSON format
+/// 3. Generating provider schema
+/// 4. Running terragrunt plan
+/// 5. Generating modules.json
+/// 6. Converting plan files to JSON format
 /// 
 /// The function is designed to be fault-tolerant and will create minimal fixtures
 /// even if some steps fail (e.g., in CI environments without cloud credentials).
@@ -405,6 +406,7 @@ fn create_minimal_plan_json(provider: &str) -> Result<()> {
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// generate_fixtures("aws")?;
 /// generate_fixtures("gcp")?;
+/// generate_fixtures("azure")?;
 /// # Ok(())
 /// # }
 /// ```
@@ -432,6 +434,15 @@ pub fn generate_fixtures(provider: &str) -> Result<()> {
         let stderr = String::from_utf8_lossy(&init_output.stderr);
         eprintln!("⚠️ Warning: terragrunt init failed for {}: {}", provider, stderr);
         // Continue despite init failure (expected in CI)
+    }
+
+    // Generate provider schema using our built-in functionality
+    println!("📋 Generating provider schema for {}...", provider);
+    if let Err(e) = write_provider_schema(Path::new(&env_path)) {
+        eprintln!("⚠️ Warning: provider schema generation failed for {}: {}", provider, e);
+        // Continue despite schema generation failure (expected in CI without credentials)
+    } else {
+        println!("✅ Provider schema generated successfully for {}", provider);
     }
 
     // Plan
