@@ -251,14 +251,11 @@ jobs:
       - name: Set up Terragrunt
         uses: metro-digital/cf-github-actions/terragrunt-setup@v1.0.0
 
-      - name: Terragrunt Plan
-        run: terragrunt plan -out=${{ github.sha }}.plan
-        working-directory: ${{ github.workspace }}/${{ matrix.environment }}/some-module
 
       - name: Import resources from plan
         uses: casibbald/terragrunt-import-from-plan@v1.0.0
         with:
-          working-directory: ${{ github.workspace }}/${{ matrix.environment }}/some-module  # Enables schema-driven intelligence
+          working-directory: ${{ github.workspace }}/${{ matrix.environment }}/some-environment  # Enables schema-driven intelligence
           plan-file: ${{ github.sha }}.plan
 ```
 
