@@ -1,9 +1,9 @@
 // main.tf
 
 resource "google_composer_environment" "example" {
-  name   = local.env_name
+  name    = local.env_name
   project = var.project_id
-  region = var.region
+  region  = var.region
 
   config {
     node_count = 3

@@ -1,9 +1,9 @@
 // main.tf
 
 resource "google_workflows_workflow" "example" {
-  name     = local.workflow_name
-  project  = var.project_id
-  region   = var.region
+  name    = local.workflow_name
+  project = var.project_id
+  region  = var.region
 
   description = "Simulated workflow"
 

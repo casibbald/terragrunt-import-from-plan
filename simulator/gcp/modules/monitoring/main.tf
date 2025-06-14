@@ -31,5 +31,5 @@ resource "google_monitoring_alert_policy" "basic_policy" {
   }
 
   notification_channels = [google_monitoring_notification_channel.email.id]
-  enabled = true
+  enabled               = true
 }

@@ -55,8 +55,8 @@ module "secrets_manager" {
 
 # CloudWatch Module - monitoring and logging
 module "cloudwatch" {
-  source     = "./modules/cloudwatch"
-  region     = var.region
+  source         = "./modules/cloudwatch"
+  region         = var.region
   log_group_name = "/aws/lambda/${module.lambda.function_name}"
 }
 

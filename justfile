@@ -29,7 +29,7 @@ init cloud=default_cloud env=default_env:
 # Plan all modules
 # Do not give a .tf to the binary output, it will not work with Terragrunt
 plan cloud=default_cloud env=default_env *VARS="":
-    cd envs/simulator/{{cloud}}/{{env}} && {{VARS}} terragrunt run-all plan -out out.tfplan
+    cd envs/simulator/{{cloud}}/{{env}} && AWS_EC2_METADATA_DISABLED=true {{VARS}} terragrunt run-all plan -out out.tfplan
 
 
 # Convert all .tfplan files to plan.json in-place under .terragrunt-cache
@@ -63,11 +63,46 @@ plan-module module cloud=default_cloud env=default_env:
 apply-module module cloud=default_cloud env=default_env:
     cd envs/simulator/{{cloud}}/{{env}}/{{module}} && terragrunt apply
 
-# Validate Terraform files. Do not run this, there are no Terraform files in this project.
-# Additionally do not run in production environments.
-validate:
-    find . -name "*.tf" -exec terraform fmt -check {} \;
-    find . -name "*.tf" -exec terraform validate {} \;
+# Comprehensive Terraform validation for all cloud providers
+validate cloud=default_cloud:
+    echo "🔍 Running comprehensive validation for {{cloud}}..."
+    just validate-format {{cloud}}
+    just validate-terraform {{cloud}}
+
+# Format validation
+validate-format cloud=default_cloud:
+    echo "📝 Checking Terraform formatting for {{cloud}}..."
+    terraform fmt -check -recursive simulator/{{cloud}}/
+
+# Terraform validate for specific cloud provider (no credentials needed)
+validate-terraform cloud=default_cloud:
+    echo "✅ Running terraform validate for {{cloud}}..."
+    cd simulator/{{cloud}} && AWS_EC2_METADATA_DISABLED=true terraform init -backend=false
+    cd simulator/{{cloud}} && AWS_EC2_METADATA_DISABLED=true terraform validate
+
+# Run all validations for all cloud providers
+validate-all:
+    echo "🌐 Running validation for all cloud providers..."
+    just validate aws
+    just validate gcp  
+    just validate azure
+
+# Fix formatting issues
+fmt cloud=default_cloud:
+    echo "🔧 Fixing Terraform formatting for {{cloud}}..."
+    terraform fmt -recursive simulator/{{cloud}}/
+
+# Fix formatting for all cloud providers  
+fmt-all:
+    echo "🔧 Fixing formatting for all cloud providers..."
+    just fmt aws
+    just fmt gcp
+    just fmt azure
+
+# CI-friendly validation (no API calls, no credentials needed)
+validate-ci:
+    echo "🚀 Running CI-friendly validation..."
+    AWS_EC2_METADATA_DISABLED=true just validate-all
 
 # Clean Terraform cache and state files (use with caution)
 clean cloud=default_cloud:
@@ -84,7 +119,7 @@ test:
 
 # Plan with error handling for testing (continues on failure)
 plan-safe cloud=default_cloud env=default_env *VARS="":
-    -cd envs/simulator/{{cloud}}/{{env}} && {{VARS}} terragrunt run-all plan -out out.tfplan
+    -cd envs/simulator/{{cloud}}/{{env}} && AWS_EC2_METADATA_DISABLED=true {{VARS}} terragrunt run-all plan -out out.tfplan
 
 # Initialize with error handling for testing (continues on failure)  
 init-safe cloud=default_cloud env=default_env:
@@ -94,10 +129,10 @@ init-safe cloud=default_cloud env=default_env:
 # Run tests with fresh provider schemas for both AWS and GCP
 test-with-fresh-schemas:
     just clean-all
-    just init-safe gcp
-    just init-safe aws
-    just plan-safe gcp
-    just plan-safe aws
+    AWS_EC2_METADATA_DISABLED=true just init-safe gcp
+    AWS_EC2_METADATA_DISABLED=true just init-safe aws
+    AWS_EC2_METADATA_DISABLED=true just plan-safe gcp
+    AWS_EC2_METADATA_DISABLED=true just plan-safe aws
     cargo test -- --test-threads=1
 
 # Multi-cloud convenience commands

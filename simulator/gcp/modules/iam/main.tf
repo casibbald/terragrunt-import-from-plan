@@ -32,7 +32,7 @@ resource "google_project_iam_binding" "developer_binding" {
 resource "google_service_account_iam_binding" "sa_binding" {
   service_account_id = google_service_account.example_sa.name
   role               = "roles/iam.serviceAccountTokenCreator"
-  members            = [
+  members = [
     "serviceAccount:${google_service_account.example_sa.email}"
   ]
 }

@@ -1,9 +1,9 @@
 // main.tf
 
 resource "google_dataproc_cluster" "example" {
-  name     = local.cluster_name
-  region   = var.region
-  project  = var.project_id
+  name    = local.cluster_name
+  region  = var.region
+  project = var.project_id
 
   cluster_config {
     master_config {

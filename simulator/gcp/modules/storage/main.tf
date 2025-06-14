@@ -1,8 +1,8 @@
 // main.tf
 
 resource "google_storage_bucket" "example" {
-  name     = local.bucket_name
-  location = var.region
+  name          = local.bucket_name
+  location      = var.region
   force_destroy = true
 
   versioning {
@@ -20,7 +20,7 @@ resource "google_storage_bucket_iam_binding" "binding" {
 
 # Placeholder for a future Transfer Job
 resource "google_storage_transfer_job" "placeholder" {
-    project = var.project_id
+  project     = var.project_id
   description = "Placeholder transfer job for simulator"
   transfer_spec {
     # Example minimal transfer_spec; adjust as needed for your use case

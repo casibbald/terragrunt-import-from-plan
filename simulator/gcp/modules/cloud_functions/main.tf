@@ -1,8 +1,8 @@
 // main.tf
 
 resource "google_storage_bucket" "example" {
-  name     = local.bucket_name
-  location = var.region
+  name          = local.bucket_name
+  location      = var.region
   force_destroy = true
 
   versioning {
@@ -22,7 +22,7 @@ resource "google_cloudfunctions_function" "example" {
   source_archive_bucket = google_storage_bucket.example.name
   source_archive_object = google_storage_bucket_object.source_archive.name
 
-  trigger_http = true
+  trigger_http        = true
   available_memory_mb = 128
 }
 

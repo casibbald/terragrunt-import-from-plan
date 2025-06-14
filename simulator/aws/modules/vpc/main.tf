@@ -1,6 +1,7 @@
-# Data source to get available availability zones
-data "aws_availability_zones" "available" {
-  state = "available"
+# Availability zones - use static values for CI/CD compatibility  
+locals {
+  # Static AZ names for CI/CD (works for any region pattern)
+  availability_zones = ["${var.region}a", "${var.region}b", "${var.region}c"]
 }
 
 # VPC - Virtual Private Cloud
@@ -29,7 +30,7 @@ resource "aws_internet_gateway" "example" {
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.example.id
   cidr_block              = "10.0.1.0/24"
-  availability_zone       = data.aws_availability_zones.available.names[0]
+  availability_zone       = local.availability_zones[0]
   map_public_ip_on_launch = true
 
   tags = {
@@ -43,7 +44,7 @@ resource "aws_subnet" "public" {
 resource "aws_subnet" "private" {
   vpc_id            = aws_vpc.example.id
   cidr_block        = "10.0.2.0/24"
-  availability_zone = data.aws_availability_zones.available.names[1 % length(data.aws_availability_zones.available.names)]
+  availability_zone = local.availability_zones[1 % length(local.availability_zones)]
 
   tags = {
     Name        = "example-private-subnet"

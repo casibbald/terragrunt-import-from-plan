@@ -2,6 +2,6 @@
 
 locals {
   function_name = "sim-cloud-function"
-  bucket_name  = "sim-cloud-function-bucket"
+  bucket_name   = "sim-cloud-function-bucket"
 }
 

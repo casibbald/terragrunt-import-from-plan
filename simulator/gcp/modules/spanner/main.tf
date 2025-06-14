@@ -1,11 +1,11 @@
 // main.tf
 
 resource "google_spanner_instance" "example" {
-  name             = local.instance_name
-  config           = "regional-${var.region}"
-  display_name     = "Simulated Spanner Instance"
-  num_nodes        = 1
-  project          = var.project_id
+  name         = local.instance_name
+  config       = "regional-${var.region}"
+  display_name = "Simulated Spanner Instance"
+  num_nodes    = 1
+  project      = var.project_id
 }
 
 resource "google_spanner_database" "example" {

@@ -27,14 +27,14 @@ resource "aws_db_parameter_group" "example" {
 
 # RDS Instance - equivalent to google_sql_database_instance
 resource "aws_db_instance" "example" {
-  identifier                = "example-postgres-db"
-  engine                   = "postgres"
-  engine_version           = "15.4"
-  instance_class           = "db.t3.micro"
-  allocated_storage        = 20
-  max_allocated_storage    = 100
-  storage_type             = "gp2"
-  storage_encrypted        = true
+  identifier            = "example-postgres-db"
+  engine                = "postgres"
+  engine_version        = "15.4"
+  instance_class        = "db.t3.micro"
+  allocated_storage     = 20
+  max_allocated_storage = 100
+  storage_type          = "gp2"
+  storage_encrypted     = true
 
   db_name  = "exampledb"
   username = "dbadmin"
@@ -45,8 +45,8 @@ resource "aws_db_instance" "example" {
   parameter_group_name   = aws_db_parameter_group.example.name
 
   backup_retention_period = 7
-  backup_window          = "03:00-04:00"
-  maintenance_window     = "sun:04:00-sun:05:00"
+  backup_window           = "03:00-04:00"
+  maintenance_window      = "sun:04:00-sun:05:00"
 
   skip_final_snapshot = true
   deletion_protection = false

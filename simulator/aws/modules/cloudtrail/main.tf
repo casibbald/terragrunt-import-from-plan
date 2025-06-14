@@ -4,8 +4,8 @@ resource "aws_cloudtrail" "example" {
   s3_bucket_name = var.bucket_name
 
   event_selector {
-    read_write_type                 = "All"
-    include_management_events       = true
+    read_write_type                  = "All"
+    include_management_events        = true
     exclude_management_event_sources = []
 
     data_resource {

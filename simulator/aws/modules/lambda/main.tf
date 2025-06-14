@@ -1,11 +1,11 @@
 # Lambda Function - equivalent to google_cloudfunctions_function
 resource "aws_lambda_function" "example" {
-  filename         = data.archive_file.lambda_zip.output_path
-  function_name    = "example-lambda-function"
-  role            = aws_iam_role.lambda_role.arn
-  handler         = "index.handler"
-  runtime         = "python3.9"
-  timeout         = 60
+  filename      = data.archive_file.lambda_zip.output_path
+  function_name = "example-lambda-function"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "index.handler"
+  runtime       = "python3.9"
+  timeout       = 60
 
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
@@ -49,7 +49,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
 data "archive_file" "lambda_zip" {
   type        = "zip"
   output_path = "${path.module}/lambda_function.zip"
-  
+
   source {
     content  = <<EOF
 def handler(event, context):
@@ -73,7 +73,7 @@ resource "aws_lambda_function_url" "example" {
     allow_methods     = ["*"]
     allow_headers     = ["date", "keep-alive"]
     expose_headers    = ["date", "keep-alive"]
-    max_age          = 86400
+    max_age           = 86400
   }
 }
 

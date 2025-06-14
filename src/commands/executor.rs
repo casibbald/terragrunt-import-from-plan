@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::process::Command;
-use anyhow::{Result, Context};
+use anyhow::Result;
 use thiserror::Error;
 
 /// Represents a terragrunt import command ready to be executed
