@@ -131,14 +131,3 @@ jobs:
           name: terragrunt-import-from-plan.zip
           path: terragrunt-import-from-plan.zip
 
-#      - name: Generate local provenance attestation
-#        uses: actions/attest-build-provenance@v2
-#        with:
-#          subject-path: terragrunt-import-from-plan.zip
-#          show-summary: true
-#
-#      - name: Upload provenance file to release
-#        uses: softprops/action-gh-release@v1
-#        with:
-#          tag_name: ${{ env.TAG_NAME }}
-#          files: terragrunt-import-from-plan.intoto.jsonl

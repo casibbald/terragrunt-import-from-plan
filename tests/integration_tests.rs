@@ -9,7 +9,7 @@ use terragrunt_import_from_plan::importer::{
 };
 use terragrunt_import_from_plan::utils::{
     collect_resources, extract_id_candidate_fields,
-    write_provider_schema, perform_just_gen
+    write_provider_schema, generate_fixtures
 };
 use serde_json::json;
 use std::collections::HashMap;
@@ -20,7 +20,9 @@ static INIT: Once = Once::new();
 
 fn setup() {
     INIT.call_once(|| {
-        perform_just_gen();
+        // Note: Legacy setup replaced with more robust setup_fresh_provider_schemas()
+        // which handles multiple providers gracefully and is CI-friendly
+        println!("🔧 Setup initialized - use setup_fresh_provider_schemas() for comprehensive testing");
     });
 }
 

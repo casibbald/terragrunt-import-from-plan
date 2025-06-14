@@ -12,21 +12,25 @@ mod utils;
 
 use crate::app::load_input_files;
 use crate::importer::{execute_or_print_imports, map_resources_to_modules};
-use crate::utils::{run_terragrunt_init, write_provider_schema};
+use crate::utils::{run_terragrunt_init, write_provider_schema, generate_fixtures, clean_workspace, extract_id_candidate_fields, validate_terraform_format, validate_terraform_config, format_terraform_files, init_terragrunt, plan_terragrunt, apply_terragrunt, destroy_terragrunt};
 use anyhow::{Context, Result};
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::path::Path;
 
 
 #[derive(Parser, Debug)]
 #[command(name = "terragrunt_import_from_plan")]
-#[command(about = "Generates terragrunt import commands from a tf.plan JSON", long_about = None)]
+#[command(about = "Terragrunt import and fixture generation tool", long_about = None)]
 struct Args {
+    #[command(subcommand)]
+    command: Option<Commands>,
+
+    // Legacy arguments for backwards compatibility  
     #[arg(long)]
-    plan: String,
+    plan: Option<String>,
 
     #[arg(long)]
-    modules: String,
+    modules: Option<String>,
 
     #[arg(long)]
     module_root: Option<String>,
@@ -37,8 +41,101 @@ struct Args {
     #[arg(long, default_value_t = false)]
     verbose: bool,
 
-    #[arg(long,)]
+    #[arg(long)]
     working_directory: Option<String>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Generate fixture files for a provider (replaces just gen)
+    GenerateFixtures {
+        /// Provider to generate fixtures for (aws, gcp, azure)
+        #[arg(value_parser = ["aws", "gcp", "azure"])]
+        provider: String,
+    },
+    /// Clean workspace files (replaces just clean)
+    Clean {
+        /// Specific provider to clean (optional, cleans all if not specified)
+        #[arg(value_parser = ["aws", "gcp", "azure"])]
+        provider: Option<String>,
+    },
+    /// Extract ID candidate fields from schema
+    ExtractIdFields {
+        /// Path to schema JSON file
+        schema_file: String,
+    },
+    /// Validate terraform formatting and configuration (replaces just validate)
+    Validate {
+        /// Provider to validate (aws, gcp, azure)
+        #[arg(value_parser = ["aws", "gcp", "azure"])]
+        provider: String,
+        /// Only check terraform formatting
+        #[arg(long)]
+        format_only: bool,
+        /// Only run terraform validate
+        #[arg(long)]
+        terraform_only: bool,
+    },
+    /// Format terraform files (replaces just fmt)
+    Fmt {
+        /// Provider to format (aws, gcp, azure)
+        #[arg(value_parser = ["aws", "gcp", "azure"])]
+        provider: String,
+        /// Check formatting without making changes
+        #[arg(long)]
+        check: bool,
+    },
+    /// Initialize terragrunt modules (replaces just init)
+    Init {
+        /// Provider to initialize (aws, gcp, azure)
+        #[arg(value_parser = ["aws", "gcp", "azure"])]
+        provider: String,
+        /// Environment (default: dev)
+        #[arg(long, default_value = "dev")]
+        env: String,
+        /// Continue on failure (safe mode)
+        #[arg(long)]
+        safe: bool,
+    },
+    /// Plan terragrunt modules (replaces just plan)
+    Plan {
+        /// Provider to plan (aws, gcp, azure)
+        #[arg(value_parser = ["aws", "gcp", "azure"])]
+        provider: String,
+        /// Environment (default: dev)
+        #[arg(long, default_value = "dev")]
+        env: String,
+        /// Environment variables (KEY=value format)
+        #[arg(long)]
+        vars: Option<String>,
+        /// Continue on failure (safe mode)
+        #[arg(long)]
+        safe: bool,
+    },
+    /// Apply terragrunt modules (replaces just apply)
+    Apply {
+        /// Provider to apply (aws, gcp, azure)
+        #[arg(value_parser = ["aws", "gcp", "azure"])]
+        provider: String,
+        /// Environment (default: dev)
+        #[arg(long, default_value = "dev")]
+        env: String,
+        /// Continue on failure (safe mode)
+        #[arg(long)]
+        safe: bool,
+    },
+    /// Destroy terragrunt modules (replaces just destroy)
+    Destroy {
+        /// Provider to destroy (aws, gcp, azure)
+        #[arg(value_parser = ["aws", "gcp", "azure"])]
+        provider: String,
+        /// Environment (default: dev)
+        #[arg(long, default_value = "dev")]
+        env: String,
+        /// Continue on failure (safe mode)
+        #[arg(long)]
+        safe: bool,
+    },
 }
 
 fn setup_provider_schema(working_directory: Option<&str>) -> Result<()> {
@@ -59,17 +156,71 @@ fn setup_provider_schema(working_directory: Option<&str>) -> Result<()> {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let (modules_file, plan_file) = load_input_files(&args.modules, &args.plan)
-        .context("Failed to load input files")?;
-    let module_root = args.module_root.clone().unwrap_or_else(|| ".".to_string());
+    match args.command {
+        Some(Commands::GenerateFixtures { provider }) => {
+            println!("🔧 Generating fixtures for {} provider...", provider);
+            generate_fixtures(&provider)
+        }
+        Some(Commands::Clean { provider }) => {
+            println!("🧹 Cleaning workspace...");
+            clean_workspace(provider.as_deref())
+        }
+        Some(Commands::ExtractIdFields { schema_file }) => {
+            let schema_content = std::fs::read_to_string(&schema_file)
+                .with_context(|| format!("Failed to read schema file: {}", schema_file))?;
+            let schema_json: serde_json::Value = serde_json::from_str(&schema_content)
+                .with_context(|| "Failed to parse schema JSON")?;
+            let candidates = extract_id_candidate_fields(&schema_json);
+            println!("ID candidate fields: {:?}", candidates);
+            Ok(())
+        }
+        Some(Commands::Validate { provider, format_only, terraform_only }) => {
+            println!("🔍 Running comprehensive validation for {}...", provider);
+            
+            if !terraform_only {
+                validate_terraform_format(&provider)?;
+            }
+            
+            if !format_only {
+                validate_terraform_config(&provider)?;
+            }
+            
+            println!("✅ Validation completed successfully for {}", provider);
+            Ok(())
+        }
+        Some(Commands::Fmt { provider, check }) => {
+            format_terraform_files(&provider, check)
+        }
+        Some(Commands::Init { provider, env, safe }) => {
+            init_terragrunt(&provider, &env, safe)
+        }
+        Some(Commands::Plan { provider, env, vars, safe }) => {
+            plan_terragrunt(&provider, &env, vars.as_deref(), safe)
+        }
+        Some(Commands::Apply { provider, env, safe }) => {
+            apply_terragrunt(&provider, &env, safe)
+        }
+        Some(Commands::Destroy { provider, env, safe }) => {
+            destroy_terragrunt(&provider, &env, safe)
+        }
+        None => {
+            // Legacy mode - require plan and modules arguments
+            let plan = args.plan.ok_or_else(|| anyhow::anyhow!("--plan argument is required when not using subcommands"))?;
+            let modules = args.modules.ok_or_else(|| anyhow::anyhow!("--modules argument is required when not using subcommands"))?;
+            
+            let (modules_file, plan_file) = load_input_files(&modules, &plan)
+                .context("Failed to load input files")?;
+            let module_root = args.module_root.clone().unwrap_or_else(|| ".".to_string());
 
-    // 🌐 Try to extract provider schema if possible
-    setup_provider_schema(args.working_directory.as_deref())?;
-    
-    let mapping = map_resources_to_modules(&modules_file.modules, &plan_file);
-    execute_or_print_imports(&mapping, &plan_file, args.dry_run, args.verbose, &module_root);
-    
-    Ok(())
+            // 🌐 Try to extract provider schema if possible
+            setup_provider_schema(args.working_directory.as_deref())?;
+            
+            let mapping = map_resources_to_modules(&modules_file.modules, &plan_file);
+            execute_or_print_imports(&mapping, &plan_file, args.dry_run, args.verbose, &module_root);
+            
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]
