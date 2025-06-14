@@ -5,7 +5,7 @@ use terragrunt_import_from_plan::{SchemaManager, AttributeMetadata, ResourceAttr
 
 /// Ensure fresh schemas exist for both AWS and GCP before running schema tests
 fn ensure_fresh_schemas() {
-    println!("🔄 Ensuring fresh provider schemas for schema integration tests...");
+    println!("🔄 Checking for existing provider schemas...");
     
     let providers = vec![
         ("gcp", "envs/simulator/gcp/dev"),
@@ -15,13 +15,14 @@ fn ensure_fresh_schemas() {
     for (provider_name, env_path) in providers {
         let schema_path = Path::new(env_path).join(".terragrunt-provider-schema.json");
         
-        // Try to generate schema if it doesn't exist or force refresh
-        if !schema_path.exists() {
-            println!("🔧 Generating {} provider schema...", provider_name);
-            match write_provider_schema(Path::new(env_path)) {
-                Ok(_) => println!("✅ Generated {} schema successfully", provider_name),
-                Err(e) => println!("⚠️ Failed to generate {} schema (expected in CI): {}", provider_name, e),
-            }
+        if schema_path.exists() {
+            let metadata = fs::metadata(&schema_path).ok();
+            let size_mb = metadata.map(|m| m.len() as f64 / 1024.0 / 1024.0).unwrap_or(0.0);
+            println!("✅ {} schema exists ({:.1}MB) - using existing file", provider_name, size_mb);
+        } else {
+            println!("⚠️ {} schema missing - tests will be skipped (expected in CI)", provider_name);
+            // Note: We don't try to generate schemas during test execution to avoid CI failures
+            // Use 'just gen-{provider}' or fixture generation utilities to create schemas
         }
     }
 }
