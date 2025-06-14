@@ -4,7 +4,7 @@ locals {
 }
 
 terraform {
-  source = "${get_repo_root()}/simulator"
+  source = "${get_repo_root()}/simulator/gcp"
 }
 
 inputs = {

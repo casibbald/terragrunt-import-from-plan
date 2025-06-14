@@ -4,7 +4,7 @@ use terragrunt_import_from_plan::{SchemaManager, AttributeMetadata, ResourceAttr
 /// Test that we can load the real schema file and parse resource attributes
 #[test]
 fn test_schema_manager_parse_real_attributes() {
-    let schema_dir = Path::new("envs/simulator/dev");
+    let schema_dir = Path::new("envs/simulator/gcp/dev");
     
     // Skip test if schema file doesn't exist (e.g., in CI without GCP access)
     if !schema_dir.join(".terragrunt-provider-schema.json").exists() {
@@ -43,7 +43,7 @@ fn test_schema_manager_parse_real_attributes() {
 /// Test parsing google_artifact_registry_repository to verify repository_id is handled correctly
 #[test]
 fn test_artifact_registry_repository_parsing() {
-    let schema_dir = Path::new("envs/simulator/dev");
+    let schema_dir = Path::new("envs/simulator/gcp/dev");
     
     if !schema_dir.join(".terragrunt-provider-schema.json").exists() {
         println!("⚠️ Skipping artifact registry test - schema file not found");
@@ -71,7 +71,7 @@ fn test_artifact_registry_repository_parsing() {
 /// Test the new get_id_candidate_attributes method
 #[test] 
 fn test_schema_driven_id_candidates() {
-    let schema_dir = Path::new("envs/simulator/dev");
+    let schema_dir = Path::new("envs/simulator/gcp/dev");
     
     if !schema_dir.join(".terragrunt-provider-schema.json").exists() {
         println!("⚠️ Skipping ID candidates test - schema file not found");
@@ -111,7 +111,7 @@ fn test_schema_driven_id_candidates() {
 /// Test listing all available resource types from the schema
 #[test]
 fn test_list_resource_types() {
-    let schema_dir = Path::new("envs/simulator/dev");
+    let schema_dir = Path::new("envs/simulator/gcp/dev");
     
     if !schema_dir.join(".terragrunt-provider-schema.json").exists() {
         println!("⚠️ Skipping resource types test - schema file not found");

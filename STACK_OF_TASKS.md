@@ -212,7 +212,7 @@ impl GoogleCloudScoringStrategy {
 ```rust
 #[test]
 fn test_schema_driven_scoring() {
-    let schema_manager = SchemaManager::new("envs/simulator/dev");
+    let schema_manager = SchemaManager::new("envs/simulator/gcp/dev");
     schema_manager.load_or_generate_schema().unwrap();
     
     // Test artifact registry scoring  
@@ -518,7 +518,7 @@ src/
 
 **📊 Current State:**
 - ✅ **Architecture Ready** - SchemaManager, scoring strategies, pluggable design all built
-- ✅ **Real Schema Data** - `envs/simulator/dev/.terragrunt-provider-schema.json` with 100+ resource types
+- ✅ **Real Schema Data** - `envs/simulator/gcp/dev/.terragrunt-provider-schema.json` with 100+ resource types
 - ✅ **Test Foundation** - 54 tests passing, ready for schema integration testing
 - ❌ **Missing Link** - Architecture not connected to real schema data
 

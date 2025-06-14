@@ -13,7 +13,7 @@
 
 ### ✅ **Already Implemented**
 - [x] Simulated GCP infrastructure with reusable modules
-- [x] Terragrunt environment in `envs/simulator/dev`
+- [x] Terragrunt environment in `envs/simulator/gcp/dev`
 - [x] Generation of `tf.plan` binary
 - [x] Conversion of `tf.plan` to JSON (`out.json`)
 - [x] Module metadata JSON (`modules.json`)

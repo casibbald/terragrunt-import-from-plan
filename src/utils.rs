@@ -146,8 +146,8 @@ pub fn clean_workspace() {
     remove_files_by_ext(root, "tfstate");
     remove_files_by_pattern(root, ".lock.hcl");
     remove_files_by_name(root, "out.tfplan");
-    remove_files_by_name(Path::new("envs/simulator/dev"), "plan.json");
-    remove_files_by_name(Path::new("envs/simulator/dev"), ".terragrunt-provider-schema.json");
+    remove_files_by_name(Path::new("envs/simulator/gcp/dev"), "plan.json");
+    remove_files_by_name(Path::new("envs/simulator/gcp/dev"), ".terragrunt-provider-schema.json");
 }
 
 pub fn perform_just_gen() {
@@ -158,7 +158,7 @@ pub fn perform_just_gen() {
     let _ = Command::new("terragrunt")
         .arg("init")
         .arg("--all")
-        .current_dir("envs/simulator/dev")
+        .current_dir("envs/simulator/gcp/dev")
         .output();
 
     // Plan
@@ -167,11 +167,11 @@ pub fn perform_just_gen() {
         .arg("plan")
         .arg("-out")
         .arg("out.tfplan")
-        .current_dir("envs/simulator/dev")
+        .current_dir("envs/simulator/gcp/dev")
         .output();
 
     // Plans-to-JSON
-    if let Ok(entries) = fs::read_dir("envs/simulator/dev/.terragrunt-cache") {
+    if let Ok(entries) = fs::read_dir("envs/simulator/gcp/dev/.terragrunt-cache") {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
@@ -198,7 +198,7 @@ pub fn perform_just_gen() {
     }
 
     // Copy-Plan-JSON
-    if let Ok(entries) = fs::read_dir("envs/simulator/dev/.terragrunt-cache") {
+    if let Ok(entries) = fs::read_dir("envs/simulator/gcp/dev/.terragrunt-cache") {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {

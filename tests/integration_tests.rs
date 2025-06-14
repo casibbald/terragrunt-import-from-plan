@@ -430,11 +430,11 @@ fn test_17_validate_module_dirs() {
 fn test_18_generate_provider_schema_in_real_env() {
     // This test verifies that the write_provider_schema function handles
     // the case where terragrunt is not initialized or GCP is not accessible
-    let schema_path = std::path::Path::new("envs/simulator/dev/.terragrunt-provider-schema.json");
+    let schema_path = std::path::Path::new("envs/simulator/gcp/dev/.terragrunt-provider-schema.json");
     let _ = std::fs::remove_file(schema_path);
 
     // Exercise the actual function to generate the provider schema
-    let result = write_provider_schema(std::path::Path::new("envs/simulator/dev"));
+    let result = write_provider_schema(std::path::Path::new("envs/simulator/gcp/dev"));
     
     // In CI or environments without GCP access, this should fail gracefully
     // In local environments with proper setup, it should succeed
