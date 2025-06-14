@@ -1,1 +1,443 @@
-{"format_version":"1.2","terraform_version":"1.9.8","planned_values":{"root_module":{"child_modules":[]}}}
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.8",
+  "variables": {
+    "aws_region": {
+      "value": "us-west-2"
+    },
+    "environment": {
+      "value": "dev"
+    }
+  },
+  "planned_values": {
+    "root_module": {
+      "child_modules": [
+        {
+          "resources": [
+            {
+              "address": "module.s3.aws_s3_bucket.example",
+              "mode": "managed",
+              "type": "aws_s3_bucket",
+              "name": "example",
+              "provider_name": "registry.terraform.io/hashicorp/aws",
+              "schema_version": 0,
+              "values": {
+                "bucket": "sim-s3-bucket-dev",
+                "bucket_domain_name": "sim-s3-bucket-dev.s3.amazonaws.com",
+                "bucket_regional_domain_name": "sim-s3-bucket-dev.s3.us-west-2.amazonaws.com",
+                "force_destroy": false,
+                "hosted_zone_id": "Z3BJ6K6RIION7M",
+                "region": "us-west-2",
+                "tags": {
+                  "Environment": "dev",
+                  "Name": "sim-s3-bucket"
+                },
+                "tags_all": {
+                  "Environment": "dev",
+                  "Name": "sim-s3-bucket"
+                },
+                "timeouts": null
+              },
+              "sensitive_values": {
+                "cors_rule": [],
+                "grant": [],
+                "lifecycle_rule": [],
+                "logging": [],
+                "notification": [],
+                "object_lock_configuration": [],
+                "policy": false,
+                "replication_configuration": [],
+                "server_side_encryption_configuration": [],
+                "tags": {},
+                "tags_all": {},
+                "versioning": [],
+                "website": []
+              }
+            }
+          ],
+          "address": "module.s3"
+        },
+        {
+          "resources": [
+            {
+              "address": "module.iam.aws_iam_role.example",
+              "mode": "managed",
+              "type": "aws_iam_role",
+              "name": "example",
+              "provider_name": "registry.terraform.io/hashicorp/aws",
+              "schema_version": 0,
+              "values": {
+                "assume_role_policy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"}}],\"Version\":\"2012-10-17\"}",
+                "description": null,
+                "force_detach_policies": false,
+                "max_session_duration": 3600,
+                "name": "sim-lambda-role",
+                "name_prefix": null,
+                "path": "/",
+                "permissions_boundary": null,
+                "tags": null,
+                "tags_all": {}
+              },
+              "sensitive_values": {
+                "inline_policy": [],
+                "managed_policy_arns": [],
+                "tags_all": {}
+              }
+            },
+            {
+              "address": "module.iam.aws_iam_role_policy_attachment.lambda_basic",
+              "mode": "managed",
+              "type": "aws_iam_role_policy_attachment",
+              "name": "lambda_basic",
+              "provider_name": "registry.terraform.io/hashicorp/aws",
+              "schema_version": 0,
+              "values": {
+                "policy_arn": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+                "role": "sim-lambda-role"
+              },
+              "sensitive_values": {}
+            }
+          ],
+          "address": "module.iam"
+        },
+        {
+          "resources": [
+            {
+              "address": "module.lambda.aws_lambda_function.example",
+              "mode": "managed",
+              "type": "aws_lambda_function",
+              "name": "example",
+              "provider_name": "registry.terraform.io/hashicorp/aws",
+              "schema_version": 0,
+              "values": {
+                "architectures": [
+                  "x86_64"
+                ],
+                "code_signing_config_arn": null,
+                "description": "Example Lambda function",
+                "environment": [],
+                "filename": "lambda_function.zip",
+                "function_name": "sim-lambda-function",
+                "handler": "index.handler",
+                "image_config": [],
+                "kms_key_arn": null,
+                "layers": null,
+                "memory_size": 128,
+                "package_type": "Zip",
+                "publish": false,
+                "reserved_concurrent_executions": -1,
+                "role": "arn:aws:iam::123456789012:role/sim-lambda-role",
+                "runtime": "python3.9",
+                "s3_bucket": null,
+                "s3_key": null,
+                "s3_object_version": null,
+                "skip_destroy": false,
+                "source_code_hash": "dummy-hash",
+                "tags": null,
+                "tags_all": {},
+                "timeout": 3,
+                "timeouts": null
+              },
+              "sensitive_values": {
+                "architectures": [
+                  false
+                ],
+                "dead_letter_config": [],
+                "environment": [],
+                "ephemeral_storage": [],
+                "file_system_config": [],
+                "image_config": [],
+                "logging_config": [],
+                "snap_start": [],
+                "tags_all": {},
+                "tracing_config": [],
+                "vpc_config": []
+              }
+            }
+          ],
+          "address": "module.lambda"
+        },
+        {
+          "resources": [
+            {
+              "address": "module.vpc.aws_vpc.main",
+              "mode": "managed",
+              "type": "aws_vpc",
+              "name": "main",
+              "provider_name": "registry.terraform.io/hashicorp/aws",
+              "schema_version": 1,
+              "values": {
+                "assign_generated_ipv6_cidr_block": false,
+                "cidr_block": "10.0.0.0/16",
+                "enable_dns_hostnames": true,
+                "enable_dns_support": true,
+                "enable_network_address_usage_metrics": null,
+                "instance_tenancy": "default",
+                "ipv4_ipam_pool_id": null,
+                "ipv4_netmask_length": null,
+                "ipv6_ipam_pool_id": null,
+                "ipv6_netmask_length": null,
+                "tags": {
+                  "Name": "sim-vpc"
+                },
+                "tags_all": {
+                  "Name": "sim-vpc"
+                }
+              },
+              "sensitive_values": {
+                "tags": {},
+                "tags_all": {}
+              }
+            },
+            {
+              "address": "module.vpc.aws_subnet.public",
+              "mode": "managed",
+              "type": "aws_subnet",
+              "name": "public",
+              "provider_name": "registry.terraform.io/hashicorp/aws",
+              "schema_version": 1,
+              "values": {
+                "assign_ipv6_address_on_creation": false,
+                "availability_zone": "us-west-2a",
+                "cidr_block": "10.0.1.0/24",
+                "customer_owned_ipv4_pool": null,
+                "enable_dns64": false,
+                "enable_lni_at_device_index": null,
+                "enable_resource_name_dns_a_record_on_launch": false,
+                "enable_resource_name_dns_aaaa_record_on_launch": false,
+                "ipv6_cidr_block": null,
+                "ipv6_native": false,
+                "map_customer_owned_ip_on_launch": false,
+                "map_public_ip_on_launch": true,
+                "outpost_arn": null,
+                "private_dns_hostname_type_on_launch": "ip-name",
+                "tags": {
+                  "Name": "sim-public-subnet"
+                },
+                "tags_all": {
+                  "Name": "sim-public-subnet"
+                },
+                "timeouts": null,
+                "vpc_id": "vpc-12345678"
+              },
+              "sensitive_values": {
+                "tags": {},
+                "tags_all": {}
+              }
+            }
+          ],
+          "address": "module.vpc"
+        },
+        {
+          "resources": [
+            {
+              "address": "module.rds.aws_db_instance.example",
+              "mode": "managed",
+              "type": "aws_db_instance",
+              "name": "example",
+              "provider_name": "registry.terraform.io/hashicorp/aws",
+              "schema_version": 2,
+              "values": {
+                "allocated_storage": 20,
+                "allow_major_version_upgrade": null,
+                "apply_immediately": null,
+                "auto_minor_version_upgrade": true,
+                "availability_zone": "us-west-2a",
+                "backup_retention_period": 0,
+                "backup_window": "03:00-04:00",
+                "ca_cert_identifier": "rds-ca-rsa2048-g1",
+                "character_set_name": null,
+                "copy_tags_to_snapshot": false,
+                "custom_iam_instance_profile": null,
+                "customer_owned_ip_enabled": false,
+                "db_name": "simdb",
+                "db_subnet_group_name": "sim-db-subnet-group",
+                "delete_automated_backups": true,
+                "deletion_protection": false,
+                "domain": null,
+                "domain_iam_role_name": null,
+                "enabled_cloudwatch_logs_exports": null,
+                "engine": "mysql",
+                "engine_version": "8.0",
+                "final_snapshot_identifier": null,
+                "identifier": "sim-db-instance",
+                "identifier_prefix": null,
+                "instance_class": "db.t3.micro",
+                "iops": null,
+                "kms_key_id": null,
+                "license_model": "general-public-license",
+                "maintenance_window": "sun:05:00-sun:06:00",
+                "manage_master_user_password": null,
+                "master_user_secret_kms_key_id": null,
+                "max_allocated_storage": null,
+                "monitoring_interval": 0,
+                "monitoring_role_arn": null,
+                "multi_az": false,
+                "nchar_character_set_name": null,
+                "network_type": "IPV4",
+                "option_group_name": "default:mysql-8-0",
+                "parameter_group_name": "default.mysql8.0",
+                "password": "password123",
+                "performance_insights_enabled": false,
+                "performance_insights_kms_key_id": null,
+                "performance_insights_retention_period": null,
+                "port": 3306,
+                "publicly_accessible": false,
+                "replica_mode": null,
+                "replicate_source_db": null,
+                "restore_to_point_in_time": [],
+                "s3_import": [],
+                "skip_final_snapshot": true,
+                "snapshot_identifier": null,
+                "storage_encrypted": false,
+                "storage_type": "gp2",
+                "tags": {
+                  "Name": "sim-db-instance"
+                },
+                "tags_all": {
+                  "Name": "sim-db-instance"
+                },
+                "timeouts": null,
+                "timezone": null,
+                "username": "admin",
+                "vpc_security_group_ids": [
+                  "sg-12345678"
+                ]
+              },
+              "sensitive_values": {
+                "blue_green_update": [],
+                "listener_endpoint": [],
+                "master_user_secret": [],
+                "password": true,
+                "restore_to_point_in_time": [],
+                "s3_import": [],
+                "tags": {},
+                "tags_all": {},
+                "vpc_security_group_ids": [
+                  false
+                ]
+              }
+            }
+          ],
+          "address": "module.rds"
+        }
+      ]
+    }
+  },
+  "provider_schemas": {
+    "provider_schemas": {
+      "registry.terraform.io/hashicorp/aws": {
+      "provider": {
+        "version": 0,
+        "block": {
+          "attributes": {
+            "region": {
+              "type": "string",
+              "description": "The region where AWS operations will take place",
+              "description_kind": "plain",
+              "required": true
+            }
+          }
+        }
+      },
+      "resource_schemas": {
+        "aws_s3_bucket": {
+          "version": 0,
+          "block": {
+            "attributes": {
+              "bucket": {
+                "type": "string",
+                "description": "The name of the bucket",
+                "description_kind": "plain",
+                "required": true
+              },
+              "id": {
+                "type": "string",
+                "description": "The bucket ID",
+                "description_kind": "plain",
+                "computed": true
+              }
+            }
+          }
+        },
+        "aws_iam_role": {
+          "version": 0,
+          "block": {
+            "attributes": {
+              "name": {
+                "type": "string",
+                "description": "The name of the role",
+                "description_kind": "plain",
+                "required": true
+              },
+              "id": {
+                "type": "string",
+                "description": "The role ID",
+                "description_kind": "plain",
+                "computed": true
+              }
+            }
+          }
+        },
+        "aws_lambda_function": {
+          "version": 0,
+          "block": {
+            "attributes": {
+              "function_name": {
+                "type": "string",
+                "description": "The name of the lambda function",
+                "description_kind": "plain",
+                "required": true
+              },
+              "id": {
+                "type": "string",
+                "description": "The function ID",
+                "description_kind": "plain",
+                "computed": true
+              }
+            }
+          }
+        },
+        "aws_vpc": {
+          "version": 1,
+          "block": {
+            "attributes": {
+              "cidr_block": {
+                "type": "string",
+                "description": "The CIDR block for the VPC",
+                "description_kind": "plain",
+                "required": true
+              },
+              "id": {
+                "type": "string",
+                "description": "The VPC ID",
+                "description_kind": "plain",
+                "computed": true
+              }
+            }
+          }
+        },
+        "aws_db_instance": {
+          "version": 2,
+          "block": {
+            "attributes": {
+              "identifier": {
+                "type": "string",
+                "description": "The RDS instance identifier",
+                "description_kind": "plain",
+                "required": true
+              },
+              "id": {
+                "type": "string",
+                "description": "The RDS instance ID",
+                "description_kind": "plain",
+                "computed": true
+              }
+            }
+          }
+        }
+      }
+    }
+    }
+  }
+}
