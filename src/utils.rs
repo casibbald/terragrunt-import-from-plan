@@ -100,9 +100,14 @@ pub enum TerragruntProcessError {
 /// # Examples
 /// ```no_run
 /// use terragrunt_import_from_plan::utils::collect_resources;
+/// use terragrunt_import_from_plan::importer::{PlannedModule, Resource};
 /// 
+/// let root_module = PlannedModule {
+///     resources: Some(vec![]),
+///     child_modules: None,
+/// };
 /// let mut all_resources = Vec::new();
-/// collect_resources(&plan.planned_values.root_module, &mut all_resources);
+/// collect_resources(&root_module, &mut all_resources);
 /// println!("Found {} resources", all_resources.len());
 /// ```
 pub fn collect_resources<'a>(module: &'a PlannedModule, resources: &mut Vec<&'a Resource>) {
@@ -131,7 +136,24 @@ pub fn collect_resources<'a>(module: &'a PlannedModule, resources: &mut Vec<&'a 
 /// # Examples
 /// ```no_run
 /// use terragrunt_import_from_plan::utils::extract_id_candidate_fields;
+/// use serde_json::json;
 /// 
+/// let schema_json = json!({
+///     "provider_schemas": {
+///         "registry.terraform.io/hashicorp/aws": {
+///             "resource_schemas": {
+///                 "aws_instance": {
+///                     "block": {
+///                         "attributes": {
+///                             "id": {},
+///                             "name": {}
+///                         }
+///                     }
+///                 }
+///             }
+///         }
+///     }
+/// });
 /// let candidates = extract_id_candidate_fields(&schema_json);
 /// println!("Found {} potential ID fields", candidates.len());
 /// ```
@@ -184,7 +206,10 @@ pub fn extract_id_candidate_fields(schema_json: &Value) -> HashSet<String> {
 /// ```no_run
 /// use terragrunt_import_from_plan::utils::run_terragrunt_init;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// run_terragrunt_init("./envs/dev")?;
+/// # Ok(())
+/// # }
 /// ```
 pub fn run_terragrunt_init(working_directory: &str) -> Result<()> {
     println!("🔧 Running `terragrunt init` in {}", working_directory);
@@ -234,11 +259,14 @@ pub fn run_terragrunt_init(working_directory: &str) -> Result<()> {
 /// ```no_run
 /// use terragrunt_import_from_plan::utils::clean_workspace;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// // Clean all providers
 /// clean_workspace(None)?;
 /// 
 /// // Clean only AWS provider
 /// clean_workspace(Some("aws"))?;
+/// # Ok(())
+/// # }
 /// ```
 pub fn clean_workspace(provider: Option<&str>) -> Result<()> {
     /// Recursively removes directories with the specified name
@@ -373,8 +401,11 @@ fn create_minimal_plan_json(provider: &str) -> Result<()> {
 /// ```no_run
 /// use terragrunt_import_from_plan::utils::generate_fixtures;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// generate_fixtures("aws")?;
 /// generate_fixtures("gcp")?;
+/// # Ok(())
+/// # }
 /// ```
 pub fn generate_fixtures(provider: &str) -> Result<()> {
     println!("🔧 Generating fixtures for {} provider...", provider);
@@ -550,7 +581,10 @@ fn generate_plan_json(provider: &str, cache_path: &str) -> Result<()> {
 /// ```no_run
 /// use terragrunt_import_from_plan::utils::validate_terraform_format;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// validate_terraform_format("aws")?;
+/// # Ok(())
+/// # }
 /// ```
 pub fn validate_terraform_format(provider: &str) -> Result<()> {
     println!("📝 Checking Terraform formatting for {}...", provider);
@@ -603,7 +637,10 @@ pub fn validate_terraform_format(provider: &str) -> Result<()> {
 /// ```no_run
 /// use terragrunt_import_from_plan::utils::validate_terraform_config;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// validate_terraform_config("gcp")?;
+/// # Ok(())
+/// # }
 /// ```
 pub fn validate_terraform_config(provider: &str) -> Result<()> {
     println!("✅ Running terraform validate for {}...", provider);
@@ -672,11 +709,14 @@ pub fn validate_terraform_config(provider: &str) -> Result<()> {
 /// ```no_run
 /// use terragrunt_import_from_plan::utils::format_terraform_files;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// // Fix formatting
 /// format_terraform_files("aws", false)?;
 /// 
 /// // Check formatting only
 /// format_terraform_files("aws", true)?;
+/// # Ok(())
+/// # }
 /// ```
 pub fn format_terraform_files(provider: &str, check_only: bool) -> Result<()> {
     let action = if check_only { "Checking" } else { "Fixing" };
@@ -754,8 +794,11 @@ pub fn format_terraform_files(provider: &str, check_only: bool) -> Result<()> {
 /// ```no_run
 /// use terragrunt_import_from_plan::utils::init_terragrunt;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// init_terragrunt("aws", "dev", false)?;
 /// init_terragrunt("gcp", "dev", true)?; // Safe mode
+/// # Ok(())
+/// # }
 /// ```
 pub fn init_terragrunt(provider: &str, env: &str, safe_mode: bool) -> Result<()> {
     println!("🚀 Initializing terragrunt for {} (env: {})...", provider, env);
@@ -815,8 +858,11 @@ pub fn init_terragrunt(provider: &str, env: &str, safe_mode: bool) -> Result<()>
 /// ```no_run
 /// use terragrunt_import_from_plan::utils::plan_terragrunt;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// plan_terragrunt("aws", "dev", None, false)?;
 /// plan_terragrunt("gcp", "dev", Some("PROJECT_ID=my-project"), true)?; // With vars and safe mode
+/// # Ok(())
+/// # }
 /// ```
 pub fn plan_terragrunt(provider: &str, env: &str, vars: Option<&str>, safe_mode: bool) -> Result<()> {
     println!("📋 Planning terragrunt for {} (env: {})...", provider, env);
@@ -896,8 +942,11 @@ pub fn plan_terragrunt(provider: &str, env: &str, vars: Option<&str>, safe_mode:
 /// ```no_run
 /// use terragrunt_import_from_plan::utils::apply_terragrunt;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// apply_terragrunt("aws", "dev", false, false)?; // Requires confirmation
 /// apply_terragrunt("gcp", "dev", true, true)?; // Auto-approve with safe mode
+/// # Ok(())
+/// # }
 /// ```
 pub fn apply_terragrunt(provider: &str, env: &str, auto_approve: bool, safe_mode: bool) -> Result<()> {
     println!("🚀 Applying terragrunt for {} (env: {})...", provider, env);
@@ -970,8 +1019,11 @@ pub fn apply_terragrunt(provider: &str, env: &str, auto_approve: bool, safe_mode
 /// ```no_run
 /// use terragrunt_import_from_plan::utils::destroy_terragrunt;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// destroy_terragrunt("aws", "dev", false, false)?; // Requires confirmation
 /// destroy_terragrunt("gcp", "dev", true, true)?; // Auto-approve with safe mode
+/// # Ok(())
+/// # }
 /// ```
 pub fn destroy_terragrunt(provider: &str, env: &str, auto_approve: bool, safe_mode: bool) -> Result<()> {
     println!("💥 Destroying terragrunt for {} (env: {})...", provider, env);
@@ -1015,5 +1067,38 @@ pub fn destroy_terragrunt(provider: &str, env: &str, auto_approve: bool, safe_mo
         } else {
             anyhow::bail!(error_msg);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_plan_summary() {
+        // Test plan summary extraction
+        let output_with_plan = "Some other output\nPlan: 5 to add, 3 to change, 1 to destroy.\nMore output";
+        assert_eq!(
+            extract_plan_summary(output_with_plan),
+            Some("Plan: 5 to add, 3 to change, 1 to destroy.".to_string())
+        );
+
+        // Test no changes case
+        let output_no_changes = "Other text\nNo changes. Your infrastructure matches the configuration.\nMore text";
+        assert_eq!(
+            extract_plan_summary(output_no_changes),
+            Some("No changes. Your infrastructure matches the configuration.".to_string())
+        );
+
+        // Test apply complete case
+        let output_apply = "Various output\nApply complete! Resources: 5 added, 3 changed, 1 destroyed.\nDone";
+        assert_eq!(
+            extract_plan_summary(output_apply),
+            Some("Apply complete! Resources: 5 added, 3 changed, 1 destroyed.".to_string())
+        );
+
+        // Test no summary found
+        let output_no_summary = "Just some regular output\nwithout any plan summary";
+        assert_eq!(extract_plan_summary(output_no_summary), None);
     }
 }
