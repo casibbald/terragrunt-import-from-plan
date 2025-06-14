@@ -3,14 +3,14 @@ default_env := env_var_or_default("ENV", "dev")
 default_region := env_var_or_default("REGION", "us-central1")
 justfile_dir := env_var_or_default("JUSTFILE_DIR", ".")
 default_project := env_var_or_default("PROJECT_ID", "my-gcp-project")
-terragrunt_dir := env_var_or_default("TERRAGRUNT_DIR", "envs/simulator/")
+terragrunt_dir := env_var_or_default("TERRAGRUNT_DIR", "envs/simulator/gcp/")
 
 # List available commands
 default:
     @just --list
 
 run:
-    cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/modules --dry-run
+    cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/gcp/modules --dry-run
 
 gen:
     just clean
@@ -34,14 +34,14 @@ plan env=default_env *VARS="":
 
 # Convert all .tfplan files to plan.json in-place under .terragrunt-cache
 plans-to-json env=default_env *VARS="":
-    cd envs/simulator/dev && \
+    cd envs/simulator/gcp/dev && \
     find .terragrunt-cache -type f -name '*.tfplan' | while read plan; do \
       echo "Converting $plan to JSON..."; \
       terraform -chdir="$(dirname "$plan")" show -json "$(basename "$plan")" | jq '.' > "test/tmp/$(basename "$plan" .tfplan).json"; \
     done
 
 copy-plan-json env=default_env *VARS="":
-    cd envs/simulator/dev && \
+    cd envs/simulator/gcp/dev && \
     find ./.terragrunt-cache -name "*.json" -type f -exec ls {} \; | while read plan; do \
       echo "Copying $plan to test/tmp..."; \
       cp "$plan" "../../../tests/fixtures/$(basename "$plan")"; \
@@ -76,8 +76,8 @@ clean:
     find . -name "*.tfstate" -type f -exec rm -f {} +
     find . -name ".*.lock.hcl" -type f -exec rm -f {} +
     find . -name "out.tfplan" -type f -exec rm -f {} +
-    find envs/simulator/dev -name "plan.json" -type f -exec rm -f {} +
-    find envs/simulator/dev -name ".terragrunt-provider-schema.json" -type f -exec rm -f {} +
+    find envs/simulator/gcp/dev -name "plan.json" -type f -exec rm -f {} +
+    find envs/simulator/gcp/dev -name ".terragrunt-provider-schema.json" -type f -exec rm -f {} +
 
 test:
     cargo test -- --test-threads=1

@@ -16,7 +16,7 @@ sequenceDiagram
     participant RustTool
 
     User->>Simulator: Define GCP infra using modules
-    User->>Simulator: Setup dev config in /envs/simulator/dev
+    User->>Simulator: Setup dev config in /envs/simulator/gcp/dev
 
     GitHubAction->>Terragrunt: Run `terragrunt plan -out=tf.plan`
     Terragrunt->>Simulator: Evaluate configuration

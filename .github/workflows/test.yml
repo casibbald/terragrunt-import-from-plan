@@ -48,7 +48,7 @@ jobs:
 
       - name: Initialize test environment
         run: |
-          cd envs/simulator/dev
+          cd envs/simulator/gcp/dev
           terragrunt init --terragrunt-non-interactive || echo "Init failed, continuing..."
           terragrunt run-all plan -out=out.tfplan --terragrunt-non-interactive || echo "Plan failed, continuing..."
 
@@ -59,7 +59,7 @@ jobs:
         run: cargo test -- --test-threads=1  --nocapture
 
       - name: Dry run test
-        run: cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/modules --dry-run --working-directory envs/simulator/dev
+        run: cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/gcp/modules --dry-run --working-directory envs/simulator/gcp/dev
 #
 #      - name: Run just plan
 #        run: just plan
