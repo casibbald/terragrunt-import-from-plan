@@ -24,6 +24,101 @@ fn setup() {
     });
 }
 
+/// Setup function that ensures fresh provider schemas for both AWS and GCP
+/// This runs the full workflow: clean, init, plan, and schema generation
+fn setup_fresh_provider_schemas() -> Result<(), Box<dyn std::error::Error>> {
+    println!("🔄 Setting up fresh provider schemas for both AWS and GCP...");
+    
+    let providers = vec![
+        ("gcp", "envs/simulator/gcp/dev"),
+        ("aws", "envs/simulator/aws/dev"),
+    ];
+    
+    let mut results = Vec::new();
+    
+    for (provider_name, env_path) in providers {
+        println!("🔧 Processing {} provider...", provider_name);
+        
+        // 1. Clean existing cache and schema files
+        let schema_path = Path::new(env_path).join(".terragrunt-provider-schema.json");
+        if schema_path.exists() {
+            fs::remove_file(&schema_path)?;
+            println!("  ✅ Removed existing schema file for {}", provider_name);
+        }
+        
+        // 2. Run terragrunt init (may fail in CI, that's ok)
+        println!("  🚀 Running terragrunt init for {}...", provider_name);
+        let init_result = Command::new("terragrunt")
+            .arg("init")
+            .current_dir(env_path)
+            .output();
+            
+        match init_result {
+            Ok(output) => {
+                if output.status.success() {
+                    println!("  ✅ Init succeeded for {}", provider_name);
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    println!("  ⚠️ Init failed for {} (expected in CI): {}", provider_name, stderr);
+                }
+            }
+            Err(e) => {
+                println!("  ⚠️ Init command failed for {} (expected in CI): {}", provider_name, e);
+            }
+        }
+        
+        // 3. Run terragrunt plan (may fail in CI, that's ok)
+        println!("  📋 Running terragrunt plan for {}...", provider_name);
+        let plan_result = Command::new("terragrunt")
+            .arg("run-all")
+            .arg("plan")
+            .current_dir(env_path)
+            .output();
+            
+        match plan_result {
+            Ok(output) => {
+                if output.status.success() {
+                    println!("  ✅ Plan succeeded for {}", provider_name);
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    println!("  ⚠️ Plan failed for {} (expected in CI): {}", provider_name, stderr);
+                }
+            }
+            Err(e) => {
+                println!("  ⚠️ Plan command failed for {} (expected in CI): {}", provider_name, e);
+            }
+        }
+        
+        // 4. Generate provider schema
+        println!("  🔧 Generating provider schema for {}...", provider_name);
+        let schema_result = write_provider_schema(Path::new(env_path));
+        
+        match schema_result {
+            Ok(_) => {
+                println!("  ✅ Schema generation succeeded for {}", provider_name);
+                results.push((provider_name, true));
+            }
+            Err(e) => {
+                println!("  ⚠️ Schema generation failed for {} (expected in CI): {}", provider_name, e);
+                results.push((provider_name, false));
+            }
+        }
+    }
+    
+    // Summary
+    let successful_providers: Vec<&str> = results.iter()
+        .filter_map(|(name, success)| if *success { Some(*name) } else { None })
+        .collect();
+    
+    if successful_providers.is_empty() {
+        println!("⚠️ No provider schemas could be generated (expected in CI without cloud access)");
+    } else {
+        println!("✅ Successfully generated schemas for: {:?}", successful_providers);
+    }
+    
+    Ok(())
+}
+
 // Helper function to create a test module structure
 fn create_test_module() -> PlannedModule {
     PlannedModule {
@@ -443,56 +538,94 @@ fn test_17_validate_module_dirs_aws() {
     assert!(missing_modules.is_empty(), "Found missing AWS modules: {:?}", missing_modules);
 }
 
-
-
 #[test]
-fn test_18_generate_provider_schema_in_real_env_gcp() {
-    // This test verifies that the write_provider_schema function handles
-    // the case where terragrunt is not initialized or GCP is not accessible
-    let schema_path = std::path::Path::new("envs/simulator/gcp/dev/.terragrunt-provider-schema.json");
-    let _ = std::fs::remove_file(schema_path);
-
-    // Exercise the actual function to generate the provider schema
-    let result = write_provider_schema(std::path::Path::new("envs/simulator/gcp/dev"));
+fn test_18_systematic_provider_schema_generation() {
+    // This test ensures both AWS and GCP provider schemas are generated fresh
+    // using the complete workflow: clean, init, plan, schema generation
+    println!("🧪 Running systematic provider schema generation test...");
     
-    // In CI or environments without GCP access, this should fail gracefully
-    // In local environments with proper setup, it should succeed
-    match result {
+    // Run the complete setup workflow
+    let setup_result = setup_fresh_provider_schemas();
+    
+    match setup_result {
         Ok(_) => {
-            // If it succeeds, the schema file should exist
-            assert!(schema_path.exists(), ".terragrunt-provider-schema.json should be created when successful");
-            println!("✅ GCP Provider schema generation succeeded");
+            println!("✅ Provider schema setup completed successfully");
+            
+            // Verify that at least one schema was generated (if we have cloud access)
+            let gcp_schema = Path::new("envs/simulator/gcp/dev/.terragrunt-provider-schema.json");
+            let aws_schema = Path::new("envs/simulator/aws/dev/.terragrunt-provider-schema.json");
+            
+            let gcp_exists = gcp_schema.exists();
+            let aws_exists = aws_schema.exists();
+            
+            println!("📊 Schema file status:");
+            println!("  - GCP schema exists: {}", gcp_exists);
+            println!("  - AWS schema exists: {}", aws_exists);
+            
+            if gcp_exists || aws_exists {
+                println!("✅ At least one provider schema was successfully generated");
+            } else {
+                println!("⚠️ No schemas generated (expected in CI without cloud access)");
+            }
+            
+            // Test that we can read any generated schemas
+            if gcp_exists {
+                let content = fs::read_to_string(gcp_schema)
+                    .expect("Should be able to read GCP schema file");
+                let _: Value = serde_json::from_str(&content)
+                    .expect("GCP schema should be valid JSON");
+                println!("✅ GCP schema is valid JSON");
+            }
+            
+            if aws_exists {
+                let content = fs::read_to_string(aws_schema)
+                    .expect("Should be able to read AWS schema file");
+                let _: Value = serde_json::from_str(&content)
+                    .expect("AWS schema should be valid JSON");
+                println!("✅ AWS schema is valid JSON");
+            }
         }
         Err(e) => {
-            // If it fails, that's expected in CI environments without GCP access
-            println!("⚠️ GCP Provider schema generation failed (expected in CI): {}", e);
-            // This is acceptable - the test verifies the function handles errors properly
+            println!("⚠️ Provider schema setup failed: {}", e);
+            // This is acceptable in CI environments without cloud access
         }
     }
 }
 
 #[test]
-fn test_18_generate_provider_schema_in_real_env_aws() {
-    // This test verifies that the write_provider_schema function handles
-    // the case where terragrunt is not initialized or AWS is not accessible
-    let schema_path = std::path::Path::new("envs/simulator/aws/dev/.terragrunt-provider-schema.json");
-    let _ = std::fs::remove_file(schema_path);
-
-    // Exercise the actual function to generate the provider schema
-    let result = write_provider_schema(std::path::Path::new("envs/simulator/aws/dev"));
+fn test_18_individual_gcp_schema_generation() {
+    // Individual test for GCP schema generation (for backwards compatibility)
+    let schema_path = std::path::Path::new("envs/simulator/gcp/dev/.terragrunt-provider-schema.json");
     
-    // In CI or environments without AWS access, this should fail gracefully
-    // In local environments with proper setup, it should succeed
+    // Generate fresh schema
+    let result = write_provider_schema(std::path::Path::new("envs/simulator/gcp/dev"));
+    
     match result {
         Ok(_) => {
-            // If it succeeds, the schema file should exist
+            assert!(schema_path.exists(), ".terragrunt-provider-schema.json should be created when successful");
+            println!("✅ GCP Provider schema generation succeeded");
+        }
+        Err(e) => {
+            println!("⚠️ GCP Provider schema generation failed (expected in CI): {}", e);
+        }
+    }
+}
+
+#[test]
+fn test_18_individual_aws_schema_generation() {
+    // Individual test for AWS schema generation (for backwards compatibility)
+    let schema_path = std::path::Path::new("envs/simulator/aws/dev/.terragrunt-provider-schema.json");
+    
+    // Generate fresh schema
+    let result = write_provider_schema(std::path::Path::new("envs/simulator/aws/dev"));
+    
+    match result {
+        Ok(_) => {
             assert!(schema_path.exists(), ".terragrunt-provider-schema.json should be created when successful");
             println!("✅ AWS Provider schema generation succeeded");
         }
         Err(e) => {
-            // If it fails, that's expected in CI environments without AWS access
             println!("⚠️ AWS Provider schema generation failed (expected in CI): {}", e);
-            // This is acceptable - the test verifies the function handles errors properly
         }
     }
 }

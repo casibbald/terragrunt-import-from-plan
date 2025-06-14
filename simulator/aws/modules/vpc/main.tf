@@ -1,3 +1,8 @@
+# Data source to get available availability zones
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
 # VPC - Virtual Private Cloud
 resource "aws_vpc" "example" {
   cidr_block           = "10.0.0.0/16"
@@ -24,7 +29,7 @@ resource "aws_internet_gateway" "example" {
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.example.id
   cidr_block              = "10.0.1.0/24"
-  availability_zone       = "${var.region}a"
+  availability_zone       = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = true
 
   tags = {
@@ -38,7 +43,7 @@ resource "aws_subnet" "public" {
 resource "aws_subnet" "private" {
   vpc_id            = aws_vpc.example.id
   cidr_block        = "10.0.2.0/24"
-  availability_zone = "${var.region}b"
+  availability_zone = data.aws_availability_zones.available.names[1]
 
   tags = {
     Name        = "example-private-subnet"

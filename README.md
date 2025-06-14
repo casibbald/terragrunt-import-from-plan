@@ -445,6 +445,22 @@ cargo test
 cargo test -- --nocapture
 ```
 
+**Fresh Provider Schema Testing:**
+For comprehensive testing with fresh provider schemas for both AWS and GCP:
+
+```bash
+just test-with-fresh-schemas
+```
+
+This command will:
+1. Clean all existing terragrunt cache and schema files
+2. Initialize both GCP and AWS environments  
+3. Run terragrunt plan for both providers
+4. Generate fresh `.terragrunt-provider-schema.json` files
+5. Run the complete test suite
+
+The tests are designed to work in both local environments (with cloud access) and CI environments (without cloud access), gracefully handling scenarios where schema generation fails.
+
 **Test Categories:**
 - **25 unit tests** - Core functionality
 - **31 binary tests** - CLI and integration logic

@@ -27,7 +27,6 @@ init cloud=default_cloud env=default_env:
     cd envs/simulator/{{cloud}}/{{env}} && terragrunt init --all
 
 # Plan all modules
-# Plan all modules
 # Do not give a .tf to the binary output, it will not work with Terragrunt
 plan cloud=default_cloud env=default_env *VARS="":
     cd envs/simulator/{{cloud}}/{{env}} && {{VARS}} terragrunt run-all plan -out out.tfplan
@@ -81,6 +80,24 @@ clean cloud=default_cloud:
     find envs/simulator/{{cloud}}/dev -name ".terragrunt-provider-schema.json" -type f -exec rm -f {} +
 
 test:
+    cargo test -- --test-threads=1
+
+# Plan with error handling for testing (continues on failure)
+plan-safe cloud=default_cloud env=default_env *VARS="":
+    -cd envs/simulator/{{cloud}}/{{env}} && {{VARS}} terragrunt run-all plan -out out.tfplan
+
+# Initialize with error handling for testing (continues on failure)  
+init-safe cloud=default_cloud env=default_env:
+    -just clean {{cloud}}
+    -cd envs/simulator/{{cloud}}/{{env}} && terragrunt init --all
+
+# Run tests with fresh provider schemas for both AWS and GCP
+test-with-fresh-schemas:
+    just clean-all
+    just init-safe gcp
+    just init-safe aws
+    just plan-safe gcp
+    just plan-safe aws
     cargo test -- --test-threads=1
 
 # Multi-cloud convenience commands
