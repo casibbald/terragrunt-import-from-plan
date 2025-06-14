@@ -2,6 +2,21 @@
 name = "terragrunt_import_from_plan"
 version = "0.1.0"
 edition = "2021"
+authors = ["Charles Sibbald <casibbald@gmail.com>"]
+description = "Generate terragrunt import commands from terraform plan files with intelligent ID inference"
+readme = "README.md"
+homepage = "https://github.com/yourusername/terragrunt-import-from-plan"
+repository = "https://github.com/yourusername/terragrunt-import-from-plan"
+license = "MIT OR Apache-2.0"
+keywords = ["terraform", "terragrunt", "import", "infrastructure", "devops"]
+categories = ["command-line-utilities", "development-tools"]
+
+# Configuration for docs.rs
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+# Include private items in documentation (our test utilities)
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
