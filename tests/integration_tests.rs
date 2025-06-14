@@ -315,8 +315,8 @@ fn test_12_score_attributes_for_id_empty() {
 
 #[test]
 fn test_13_generate_import_commands() {
-    let modules_data = fs::read_to_string("tests/fixtures/modules.json").expect("Unable to read modules file");
-    let plan_data = fs::read_to_string("tests/fixtures/out.json").expect("Unable to read plan file");
+    let modules_data = fs::read_to_string("tests/fixtures/gcp/modules.json").expect("Unable to read modules file");
+    let plan_data = fs::read_to_string("tests/fixtures/gcp/out.json").expect("Unable to read plan file");
 
     let modules_file: ModulesFile = serde_json::from_str(&modules_data).expect("Invalid modules JSON");
     let plan: PlanFile = serde_json::from_str(&plan_data).expect("Invalid plan JSON");
@@ -332,7 +332,7 @@ fn test_13_generate_import_commands() {
 
 #[test]
 fn test_14_infer_resource_id() {
-    let plan_data = fs::read_to_string("tests/fixtures/out.json").expect("Unable to read plan file");
+    let plan_data = fs::read_to_string("tests/fixtures/gcp/out.json").expect("Unable to read plan file");
     let plan: PlanFile = serde_json::from_str(&plan_data).expect("Invalid plan JSON");
     let verbose = true;
 
@@ -379,8 +379,8 @@ fn test_14_infer_resource_id() {
 
 #[test]
 fn test_15_map_resources_to_modules() {
-    let modules_data = fs::read_to_string("tests/fixtures/modules.json").expect("Unable to read modules file");
-    let plan_data = fs::read_to_string("tests/fixtures/out.json").expect("Unable to read plan file");
+    let modules_data = fs::read_to_string("tests/fixtures/gcp/modules.json").expect("Unable to read modules file");
+    let plan_data = fs::read_to_string("tests/fixtures/gcp/out.json").expect("Unable to read plan file");
 
     let modules_file: ModulesFile = serde_json::from_str(&modules_data).expect("Invalid modules JSON");
     let plan: PlanFile = serde_json::from_str(&plan_data).expect("Invalid plan JSON");
@@ -415,19 +415,38 @@ fn test_16_run_terragrunt_import_mock() {
 }
 
 #[test]
-fn test_17_validate_module_dirs() {
-    let data = fs::read_to_string("tests/fixtures/modules.json").expect("Unable to read file");
+fn test_17_validate_module_dirs_gcp() {
+    let data = fs::read_to_string("tests/fixtures/gcp/modules.json").expect("Unable to read file");
     let modules_file: ModulesFile = serde_json::from_str(&data).expect("Invalid JSON");
 
     let errors = validate_module_dirs(&modules_file.modules, Path::new("simulator/gcp"));
 
-    assert!(errors.is_empty(), "Found invalid directories: {:?}", errors);
+    assert!(errors.is_empty(), "Found invalid GCP directories: {:?}", errors);
+}
+
+#[test]
+fn test_17_validate_module_dirs_aws() {
+    // Test that our AWS modules exist - these are the actual modules we created
+    let aws_modules = vec![
+        "s3", "iam", "vpc", "lambda", "rds", "ecr", "kms", 
+        "sns", "secrets_manager", "cloudwatch", "cloudtrail"
+    ];
+    
+    let mut missing_modules = Vec::new();
+    for module in aws_modules {
+        let module_path = Path::new("simulator/aws/modules").join(module);
+        if !module_path.exists() {
+            missing_modules.push(format!("Missing AWS module: {}", module));
+        }
+    }
+
+    assert!(missing_modules.is_empty(), "Found missing AWS modules: {:?}", missing_modules);
 }
 
 
 
 #[test]
-fn test_18_generate_provider_schema_in_real_env() {
+fn test_18_generate_provider_schema_in_real_env_gcp() {
     // This test verifies that the write_provider_schema function handles
     // the case where terragrunt is not initialized or GCP is not accessible
     let schema_path = std::path::Path::new("envs/simulator/gcp/dev/.terragrunt-provider-schema.json");
@@ -442,12 +461,99 @@ fn test_18_generate_provider_schema_in_real_env() {
         Ok(_) => {
             // If it succeeds, the schema file should exist
             assert!(schema_path.exists(), ".terragrunt-provider-schema.json should be created when successful");
-            println!("✅ Provider schema generation succeeded");
+            println!("✅ GCP Provider schema generation succeeded");
         }
         Err(e) => {
             // If it fails, that's expected in CI environments without GCP access
-            println!("⚠️ Provider schema generation failed (expected in CI): {}", e);
+            println!("⚠️ GCP Provider schema generation failed (expected in CI): {}", e);
             // This is acceptable - the test verifies the function handles errors properly
         }
+    }
+}
+
+#[test]
+fn test_18_generate_provider_schema_in_real_env_aws() {
+    // This test verifies that the write_provider_schema function handles
+    // the case where terragrunt is not initialized or AWS is not accessible
+    let schema_path = std::path::Path::new("envs/simulator/aws/dev/.terragrunt-provider-schema.json");
+    let _ = std::fs::remove_file(schema_path);
+
+    // Exercise the actual function to generate the provider schema
+    let result = write_provider_schema(std::path::Path::new("envs/simulator/aws/dev"));
+    
+    // In CI or environments without AWS access, this should fail gracefully
+    // In local environments with proper setup, it should succeed
+    match result {
+        Ok(_) => {
+            // If it succeeds, the schema file should exist
+            assert!(schema_path.exists(), ".terragrunt-provider-schema.json should be created when successful");
+            println!("✅ AWS Provider schema generation succeeded");
+        }
+        Err(e) => {
+            // If it fails, that's expected in CI environments without AWS access
+            println!("⚠️ AWS Provider schema generation failed (expected in CI): {}", e);
+            // This is acceptable - the test verifies the function handles errors properly
+        }
+    }
+}
+
+#[test]
+fn test_19_multi_cloud_module_root_gcp() {
+    // Test that the tool works correctly with GCP module root
+    let modules_data = fs::read_to_string("tests/fixtures/gcp/modules.json").expect("Unable to read modules file");
+    let plan_data = fs::read_to_string("tests/fixtures/gcp/out.json").expect("Unable to read plan file");
+
+    let modules_file: ModulesFile = serde_json::from_str(&modules_data).expect("Invalid modules JSON");
+    let plan: PlanFile = serde_json::from_str(&plan_data).expect("Invalid plan JSON");
+
+    let mapping = map_resources_to_modules(&modules_file.modules, &plan);
+    let commands = generate_import_commands(&mapping, &plan, "simulator/gcp/modules", true);
+
+    // Commands should be generated and contain the GCP module path
+    assert!(!commands.is_empty(), "No import commands generated for GCP modules");
+    for cmd in &commands {
+        assert!(cmd.contains("simulator/gcp/modules"), "Command does not contain GCP module path: {}", cmd);
+    }
+}
+
+#[test]
+fn test_19_multi_cloud_aws_directory_structure() {
+    // Test that AWS module directory structure is correctly recognized
+    let aws_module_root = "simulator/aws/modules";
+    
+    // Test that we can construct paths correctly for AWS modules
+    let test_module_paths = vec![
+        format!("{}/s3", aws_module_root),
+        format!("{}/lambda", aws_module_root),
+        format!("{}/iam", aws_module_root),
+        format!("{}/vpc", aws_module_root),
+    ];
+
+    for path in test_module_paths {
+        let module_path = Path::new(&path);
+        assert!(module_path.exists(), "AWS module path does not exist: {}", path);
+        
+        // Test that main.tf exists in each module
+        let main_tf = module_path.join("main.tf");
+        assert!(main_tf.exists(), "main.tf not found in AWS module: {}", path);
+    }
+}
+
+#[test]
+fn test_19_multi_cloud_module_root_aws() {
+    // Test that the tool works correctly with AWS module root
+    let modules_data = fs::read_to_string("tests/fixtures/aws/modules.json").expect("Unable to read AWS modules file");
+    let plan_data = fs::read_to_string("tests/fixtures/aws/out.json").expect("Unable to read AWS plan file");
+
+    let modules_file: ModulesFile = serde_json::from_str(&modules_data).expect("Invalid AWS modules JSON");
+    let plan: PlanFile = serde_json::from_str(&plan_data).expect("Invalid AWS plan JSON");
+
+    let mapping = map_resources_to_modules(&modules_file.modules, &plan);
+    let commands = generate_import_commands(&mapping, &plan, "simulator/aws/modules", true);
+
+    // Commands should be generated and contain the AWS module path
+    assert!(!commands.is_empty(), "No import commands generated for AWS modules");
+    for cmd in &commands {
+        assert!(cmd.contains("simulator/aws/modules"), "Command does not contain AWS module path: {}", cmd);
     }
 }

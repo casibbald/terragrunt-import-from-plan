@@ -239,8 +239,10 @@ cargo bench
 
 ### Test Fixtures Location
 
-- `tests/fixtures/out.json` - Sample terraform plan output
-- `tests/fixtures/modules.json` - Sample modules configuration
+- `tests/fixtures/gcp/out.json` - Sample GCP terraform plan output
+- `tests/fixtures/gcp/modules.json` - Sample GCP modules configuration
+- `tests/fixtures/aws/out.json` - Sample AWS terraform plan output
+- `tests/fixtures/aws/modules.json` - Sample AWS modules configuration
 - `envs/simulator/gcp/dev/.terragrunt-provider-schema.json` - Real provider schema (6.3MB)
 
 ### Creating New Test Fixtures

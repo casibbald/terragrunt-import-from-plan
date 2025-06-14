@@ -46,20 +46,29 @@ jobs:
       - name: Cargo build
         run: cargo build
 
-      - name: Initialize test environment
+      - name: Initialize GCP test environment
         run: |
           cd envs/simulator/gcp/dev
-          terragrunt init --terragrunt-non-interactive || echo "Init failed, continuing..."
-          terragrunt run-all plan -out=out.tfplan --terragrunt-non-interactive || echo "Plan failed, continuing..."
+          terragrunt init --terragrunt-non-interactive || echo "GCP init failed, continuing..."
+          terragrunt run-all plan -out=out.tfplan --terragrunt-non-interactive || echo "GCP plan failed, continuing..."
+
+      - name: Initialize AWS test environment
+        run: |
+          cd envs/simulator/aws/dev
+          terragrunt init --terragrunt-non-interactive || echo "AWS init failed, continuing..."
+          terragrunt run-all plan -out=out.tfplan --terragrunt-non-interactive || echo "AWS plan failed, continuing..."
 
       - name: Cargo test
         run: cargo test -- --test-threads=1
 
-      - name: Cargo test2
-        run: cargo test -- --test-threads=1  --nocapture
+      - name: Cargo test with output
+        run: cargo test -- --test-threads=1 --nocapture
 
-      - name: Dry run test
-        run: cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/gcp/modules --dry-run --working-directory envs/simulator/gcp/dev
+      - name: Dry run test - GCP modules
+        run: cargo run -- --plan tests/fixtures/gcp/out.json --modules tests/fixtures/gcp/modules.json --module-root simulator/gcp/modules --dry-run --working-directory envs/simulator/gcp/dev
+
+      - name: Dry run test - AWS modules
+        run: cargo run -- --plan tests/fixtures/aws/out.json --modules tests/fixtures/aws/modules.json --module-root simulator/aws/modules --dry-run --working-directory envs/simulator/aws/dev
 #
 #      - name: Run just plan
 #        run: just plan

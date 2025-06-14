@@ -1,0 +1,198 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.8",
+  "variables": {
+    "aws_region": {
+      "value": "us-east-1"
+    },
+    "environment": {
+      "value": "dev"
+    }
+  },
+  "planned_values": {
+    "root_module": {
+      "child_modules": [
+        {
+          "resources": [
+            {
+              "address": "module.s3.aws_s3_bucket.example",
+              "mode": "managed",
+              "type": "aws_s3_bucket",
+              "name": "example",
+              "provider_name": "registry.terraform.io/hashicorp/aws",
+              "schema_version": 0,
+              "values": {
+                "bucket": "sim-s3-bucket-example-12345",
+                "force_destroy": false,
+                "tags": {
+                  "Environment": "dev",
+                  "Name": "Example S3 Bucket"
+                }
+              },
+              "sensitive_values": {
+                "cors_rule": [],
+                "grant": [],
+                "lifecycle_rule": [],
+                "logging": [],
+                "notification": [],
+                "object_lock_configuration": [],
+                "replication_configuration": [],
+                "server_side_encryption_configuration": [],
+                "tags": {},
+                "versioning": [],
+                "website": []
+              }
+            }
+          ],
+          "address": "module.s3"
+        },
+        {
+          "resources": [
+            {
+              "address": "module.iam.aws_iam_role.example",
+              "mode": "managed",
+              "type": "aws_iam_role",
+              "name": "example",
+              "provider_name": "registry.terraform.io/hashicorp/aws",
+              "schema_version": 0,
+              "values": {
+                "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}",
+                "description": "Example IAM role",
+                "force_detach_policies": false,
+                "max_session_duration": 3600,
+                "name": "sim-iam-role",
+                "path": "/",
+                "tags": {
+                  "Environment": "dev"
+                }
+              },
+              "sensitive_values": {
+                "inline_policy": [],
+                "tags": {}
+              }
+            }
+          ],
+          "address": "module.iam"
+        },
+        {
+          "resources": [
+            {
+              "address": "module.lambda.aws_lambda_function.example",
+              "mode": "managed",
+              "type": "aws_lambda_function",
+              "name": "example",
+              "provider_name": "registry.terraform.io/hashicorp/aws",
+              "schema_version": 0,
+              "values": {
+                "architectures": ["x86_64"],
+                "description": "Example Lambda function",
+                "filename": "lambda.zip",
+                "function_name": "sim-lambda-function",
+                "handler": "index.handler",
+                "memory_size": 128,
+                "publish": false,
+                "runtime": "python3.9",
+                "timeout": 30,
+                "tags": {
+                  "Environment": "dev"
+                }
+              },
+              "sensitive_values": {
+                "architectures": [false],
+                "dead_letter_config": [],
+                "environment": [],
+                "ephemeral_storage": [],
+                "file_system_config": [],
+                "image_config": [],
+                "logging_config": [],
+                "tags": {},
+                "tracing_config": [],
+                "vpc_config": []
+              }
+            }
+          ],
+          "address": "module.lambda"
+        }
+      ]
+    }
+  },
+  "provider_schemas": {
+    "provider_schemas": {
+      "registry.terraform.io/hashicorp/aws": {
+        "resource_schemas": {
+          "aws_s3_bucket": {
+            "version": 0,
+            "block": {
+              "attributes": {
+                "bucket": {
+                  "type": "string",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "computed": true
+                },
+                "id": {
+                  "type": "string",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "computed": true
+                },
+                "arn": {
+                  "type": "string",
+                  "description_kind": "plain",
+                  "computed": true
+                }
+              }
+            }
+          },
+          "aws_iam_role": {
+            "version": 0,
+            "block": {
+              "attributes": {
+                "name": {
+                  "type": "string",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "computed": true
+                },
+                "id": {
+                  "type": "string",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "computed": true
+                },
+                "arn": {
+                  "type": "string",
+                  "description_kind": "plain",
+                  "computed": true
+                }
+              }
+            }
+          },
+          "aws_lambda_function": {
+            "version": 0,
+            "block": {
+              "attributes": {
+                "function_name": {
+                  "type": "string",
+                  "description_kind": "plain",
+                  "required": true
+                },
+                "id": {
+                  "type": "string",
+                  "description_kind": "plain",
+                  "optional": true,
+                  "computed": true
+                },
+                "arn": {
+                  "type": "string",
+                  "description_kind": "plain",
+                  "computed": true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+} 

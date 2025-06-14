@@ -3,45 +3,46 @@ default_env := env_var_or_default("ENV", "dev")
 default_region := env_var_or_default("REGION", "us-central1")
 justfile_dir := env_var_or_default("JUSTFILE_DIR", ".")
 default_project := env_var_or_default("PROJECT_ID", "my-gcp-project")
-terragrunt_dir := env_var_or_default("TERRAGRUNT_DIR", "envs/simulator/gcp/")
+default_cloud := env_var_or_default("CLOUD", "gcp")
+terragrunt_dir := env_var_or_default("TERRAGRUNT_DIR", "envs/simulator/" + default_cloud + "/")
 
 # List available commands
 default:
     @just --list
 
-run:
-    cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/gcp/modules --dry-run
+run cloud=default_cloud:
+    cargo run -- --plan tests/fixtures/{{cloud}}/out.json --modules tests/fixtures/{{cloud}}/modules.json --module-root simulator/{{cloud}}/modules --dry-run
 
-gen:
-    just clean
-    just init
-    just plan
-    just plans-to-json
-    just copy-plan-json
+gen cloud=default_cloud:
+    just clean {{cloud}}
+    just init {{cloud}}
+    just plan {{cloud}}
+    just plans-to-json {{cloud}}
+    just copy-plan-json {{cloud}}
 
 
 # Initialize all modules
-init env=default_env:
-    just clean
-    cd {{terragrunt_dir}}/{{env}} && terragrunt init --all
+init cloud=default_cloud env=default_env:
+    just clean {{cloud}}
+    cd envs/simulator/{{cloud}}/{{env}} && terragrunt init --all
 
 # Plan all modules
 # Plan all modules
 # Do not give a .tf to the binary output, it will not work with Terragrunt
-plan env=default_env *VARS="":
-    cd {{terragrunt_dir}}/{{env}} && {{VARS}} terragrunt run-all plan -out out.tfplan
+plan cloud=default_cloud env=default_env *VARS="":
+    cd envs/simulator/{{cloud}}/{{env}} && {{VARS}} terragrunt run-all plan -out out.tfplan
 
 
 # Convert all .tfplan files to plan.json in-place under .terragrunt-cache
-plans-to-json env=default_env *VARS="":
-    cd envs/simulator/gcp/dev && \
+plans-to-json cloud=default_cloud env=default_env *VARS="":
+    cd envs/simulator/{{cloud}}/{{env}} && \
     find .terragrunt-cache -type f -name '*.tfplan' | while read plan; do \
       echo "Converting $plan to JSON..."; \
       terraform -chdir="$(dirname "$plan")" show -json "$(basename "$plan")" | jq '.' > "test/tmp/$(basename "$plan" .tfplan).json"; \
     done
 
-copy-plan-json env=default_env *VARS="":
-    cd envs/simulator/gcp/dev && \
+copy-plan-json cloud=default_cloud env=default_env *VARS="":
+    cd envs/simulator/{{cloud}}/{{env}} && \
     find ./.terragrunt-cache -name "*.json" -type f -exec ls {} \; | while read plan; do \
       echo "Copying $plan to test/tmp..."; \
       cp "$plan" "../../../tests/fixtures/$(basename "$plan")"; \
@@ -49,19 +50,19 @@ copy-plan-json env=default_env *VARS="":
 
 
 # Apply all modules
-apply env=default_env:
-    cd {{terragrunt_dir}}/{{env}} && terragrunt run-all apply
+apply cloud=default_cloud env=default_env:
+    cd envs/simulator/{{cloud}}/{{env}} && terragrunt run-all apply
 
 # Destroy all infrastructure
-destroy env=default_env:
-    cd {{terragrunt_dir}}/{{env}} && terragrunt run-all destroy
+destroy cloud=default_cloud env=default_env:
+    cd envs/simulator/{{cloud}}/{{env}} && terragrunt run-all destroy
 
 # Module-specific commands
-plan-module module env=default_env:
-    cd {{terragrunt_dir}}/{{env}}/{{module}} && terragrunt plan -out ../../../test/tmp/{{module}}.tf
+plan-module module cloud=default_cloud env=default_env:
+    cd envs/simulator/{{cloud}}/{{env}}/{{module}} && terragrunt plan -out ../../../test/tmp/{{module}}.tf
 
-apply-module module env=default_env:
-    cd {{terragrunt_dir}}/{{env}}/{{module}} && terragrunt apply
+apply-module module cloud=default_cloud env=default_env:
+    cd envs/simulator/{{cloud}}/{{env}}/{{module}} && terragrunt apply
 
 # Validate Terraform files. Do not run this, there are no Terraform files in this project.
 # Additionally do not run in production environments.
@@ -70,14 +71,37 @@ validate:
     find . -name "*.tf" -exec terraform validate {} \;
 
 # Clean Terraform cache and state files (use with caution)
-clean:
+clean cloud=default_cloud:
     find . -name ".terraform" -type d -exec rm -rf {} +
     find . -name ".terragrunt-cache" -type d -exec rm -rf {} +
     find . -name "*.tfstate" -type f -exec rm -f {} +
     find . -name ".*.lock.hcl" -type f -exec rm -f {} +
     find . -name "out.tfplan" -type f -exec rm -f {} +
-    find envs/simulator/gcp/dev -name "plan.json" -type f -exec rm -f {} +
-    find envs/simulator/gcp/dev -name ".terragrunt-provider-schema.json" -type f -exec rm -f {} +
+    find envs/simulator/{{cloud}}/dev -name "plan.json" -type f -exec rm -f {} +
+    find envs/simulator/{{cloud}}/dev -name ".terragrunt-provider-schema.json" -type f -exec rm -f {} +
 
 test:
     cargo test -- --test-threads=1
+
+# Multi-cloud convenience commands
+run-gcp:
+    just run gcp
+
+run-aws:
+    just run aws
+
+gen-gcp:
+    just gen gcp
+
+gen-aws:
+    just gen aws
+
+init-gcp:
+    just init gcp
+
+init-aws:
+    just init aws
+
+clean-all:
+    just clean gcp
+    just clean aws

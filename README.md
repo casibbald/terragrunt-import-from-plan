@@ -467,12 +467,12 @@ cargo test
 
 **With GCP modules:**
 ```bash
-cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/gcp/modules --dry-run
+cargo run -- --plan tests/fixtures/gcp/out.json --modules tests/fixtures/gcp/modules.json --module-root simulator/gcp/modules --dry-run
 ```
 
 **With AWS modules:**
 ```bash
-cargo run -- --plan tests/fixtures/out.json --modules tests/fixtures/modules.json --module-root simulator/aws/modules --dry-run
+cargo run -- --plan tests/fixtures/aws/out.json --modules tests/fixtures/aws/modules.json --module-root simulator/aws/modules --dry-run
 ```
 
 ## Legacy Bash version
