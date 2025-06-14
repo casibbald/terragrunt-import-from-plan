@@ -43,7 +43,7 @@ jobs:
 
       - name: Setup terragrunt
         run: |
-          wget -q -O terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v0.67.16/terragrunt_linux_amd64
+          wget -q -O terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v0.81.0/terragrunt_linux_amd64
           chmod +x terragrunt
           sudo mv terragrunt /usr/local/bin/
 

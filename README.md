@@ -459,13 +459,15 @@ This command will:
 4. Generate fresh `.terragrunt-provider-schema.json` files
 5. Run the complete test suite
 
-The tests are designed to work in both local environments (with cloud access) and CI environments (without cloud access), gracefully handling scenarios where schema generation fails.
+The tests are designed to work in both local environments (with or without cloud credentials) and CI environments.
 
-**Test Categories:**
-- **25 unit tests** - Core functionality
-- **31 binary tests** - CLI and integration logic
-- **18 integration tests** - End-to-end scenarios  
-- **5 schema integration tests** - Schema-driven intelligence validation
+### 🔍 **Multi-Provider Testing Notes**
+
+**GCP Testing**: In environments with GCP credentials, generates comprehensive plans with 60+ resources across all modules (BigQuery, Cloud Run, GKE, etc.)
+
+**AWS Testing**: Comprehensive testing with 19+ resources across all AWS modules (S3, IAM, Lambda, VPC, RDS, ECR, KMS, SNS, Secrets Manager, CloudWatch, CloudTrail). Uses enhanced fixtures to ensure thorough validation even in environments without AWS credentials.
+
+**CI/CD**: Both providers are tested systematically in GitHub workflows, with graceful handling of credential limitations.
 
 📖 **For detailed testing information, see [TESTING.md](TESTING.md)** - comprehensive guide covering test categories, coverage reports, debugging, and contribution guidelines.
 
