@@ -80,7 +80,7 @@ clean cloud=default_cloud:
     cargo run -- clean {{cloud}}
 
 test:
-    cargo test -- --test-threads=1
+    cargo test --test integration_tests -- --test-threads=1 --nocapture
 
 # Plan with error handling for testing (continues on failure)
 plan-safe cloud=default_cloud env=default_env *VARS="":
@@ -102,7 +102,8 @@ test-all:
     cargo run -- plan gcp --safe
     cargo run -- plan aws --safe
     cargo run -- plan azure --safe
-    cargo test -- --test-threads=1 -- --nocapture
+    cargo test -- --test-threads=1
+
 
 # Multi-cloud convenience commands
 run-gcp:
