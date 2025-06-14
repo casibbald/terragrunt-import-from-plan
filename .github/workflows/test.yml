@@ -1,11 +1,11 @@
 name: Multi-Provider Import Testing
 
 # Comprehensive testing workflow that:
-# 1. Tests both AWS and GCP provider schema generation
+# 1. Tests AWS, GCP, and Azure provider schema generation
 # 2. Runs systematic provider initialization with graceful failure handling  
-# 3. Generates fresh .terragrunt-provider-schema.json files for both providers
+# 3. Generates fresh .terragrunt-provider-schema.json files for all providers
 # 4. Executes 87+ comprehensive tests covering core logic and schema-driven intelligence
-# 5. Performs dry-run import testing on both provider modules
+# 5. Performs dry-run import testing on all provider modules (AWS, GCP, Azure)
 
 on:
   workflow_dispatch:
@@ -52,6 +52,8 @@ jobs:
 
       - name: Cargo build
         run: cargo build
+        env:
+          RUSTFLAGS: "-A unused -A dead_code"
 
       - name: Initialize multi-provider test environment with fresh schemas
         run: |
@@ -61,6 +63,8 @@ jobs:
           # Set minimal required environment variables for CI
           PROJECT_ID: "ci-test-project"
           REGION: "us-central1"
+          # Suppress warnings for cleaner CI output
+          RUSTFLAGS: "-A unused -A dead_code"
 
       - name: Verify provider schemas were generated
         run: |
@@ -78,6 +82,13 @@ jobs:
           else
             echo "⚠️ AWS provider schema not found (expected in CI without AWS credentials)"
           fi
+          
+          if [ -f "envs/simulator/azure/dev/.terragrunt-provider-schema.json" ]; then
+            echo "✅ Azure provider schema exists"
+            echo "📊 Azure schema size: $(wc -c < envs/simulator/azure/dev/.terragrunt-provider-schema.json) bytes"
+          else
+            echo "⚠️ Azure provider schema not found (expected in CI without Azure credentials)"
+          fi
 
       - name: Show comprehensive test results
         run: |
@@ -94,9 +105,20 @@ jobs:
           echo ""
           echo "🔄 Multi-provider workflow test results:"
           cargo test test_multi_provider --quiet -- --nocapture 2>&1 | grep -E "(✅|⚠️|🎯)" || true
+        env:
+          RUSTFLAGS: "-A unused -A dead_code"
 
       - name: Dry run test - GCP modules  
         run: cargo run -- --plan tests/fixtures/gcp/out.json --modules tests/fixtures/gcp/modules.json --module-root simulator/gcp/modules --dry-run --working-directory envs/simulator/gcp/dev
+        env:
+          RUSTFLAGS: "-A unused -A dead_code"
 
       - name: Dry run test - AWS modules
         run: cargo run -- --plan tests/fixtures/aws/out.json --modules tests/fixtures/aws/modules.json --module-root simulator/aws/modules --dry-run --working-directory envs/simulator/aws/dev
+        env:
+          RUSTFLAGS: "-A unused -A dead_code"
+
+      - name: Dry run test - Azure modules
+        run: cargo run -- --plan tests/fixtures/azure/out.json --modules tests/fixtures/azure/modules.json --module-root simulator/azure/modules --dry-run --working-directory envs/simulator/azure/dev
+        env:
+          RUSTFLAGS: "-A unused -A dead_code"
