@@ -449,6 +449,8 @@ pub fn generate_fixtures(provider: &str) -> Result<()> {
         .arg("init")
         .arg("--all")
         .current_dir(&env_path)
+        .env("TF_IN_AUTOMATION", "true")
+        .env("CHECKPOINT_DISABLE", "true")
         .output()
         .with_context(|| format!("Failed to run terragrunt init for {}", provider))?;
 
@@ -470,11 +472,13 @@ pub fn generate_fixtures(provider: &str) -> Result<()> {
     // Plan
     println!("📋 Running terragrunt plan for {}...", provider);
     let plan_output = Command::new("terragrunt")
-        .arg("run-all")
         .arg("plan")
+        .arg("--all")
         .arg("-out")
         .arg("out.tfplan")
         .current_dir(&env_path)
+        .env("TF_IN_AUTOMATION", "true")
+        .env("CHECKPOINT_DISABLE", "true")
         .output()
         .with_context(|| format!("Failed to run terragrunt plan for {}", provider))?;
 
@@ -714,6 +718,8 @@ pub fn validate_terraform_config(provider: &str) -> Result<()> {
         .arg("-backend=false")
         .current_dir(&simulator_path)
         .env("AWS_EC2_METADATA_DISABLED", "true")
+        .env("TF_IN_AUTOMATION", "true")
+        .env("CHECKPOINT_DISABLE", "true")
         .output()
         .with_context(|| format!("Failed to run terraform init for {}", provider))?;
 
@@ -727,6 +733,8 @@ pub fn validate_terraform_config(provider: &str) -> Result<()> {
         .arg("validate")
         .current_dir(&simulator_path)
         .env("AWS_EC2_METADATA_DISABLED", "true")
+        .env("TF_IN_AUTOMATION", "true")
+        .env("CHECKPOINT_DISABLE", "true")
         .output()
         .with_context(|| format!("Failed to run terraform validate for {}", provider))?;
 
@@ -873,6 +881,8 @@ pub fn init_terragrunt(provider: &str, env: &str, safe_mode: bool) -> Result<()>
         .arg("init")
         .arg("--all")
         .current_dir(&env_path)
+        .env("TF_IN_AUTOMATION", "true")
+        .env("CHECKPOINT_DISABLE", "true")
         .output()
         .with_context(|| format!("Failed to run terragrunt init for {}", provider))?;
 
@@ -930,12 +940,14 @@ pub fn plan_terragrunt(provider: &str, env: &str, vars: Option<&str>, safe_mode:
     }
 
     let mut cmd = Command::new("terragrunt");
-    cmd.arg("run-all")
-        .arg("plan")
+    cmd.arg("plan")
+        .arg("--all")
         .arg("-out")
         .arg("out.tfplan")
         .current_dir(&env_path)
-        .env("AWS_EC2_METADATA_DISABLED", "true");
+        .env("AWS_EC2_METADATA_DISABLED", "true")
+        .env("TF_IN_AUTOMATION", "true")
+        .env("CHECKPOINT_DISABLE", "true");
 
     // Add environment variables if provided
     if let Some(vars_str) = vars {
@@ -1014,10 +1026,12 @@ pub fn apply_terragrunt(provider: &str, env: &str, auto_approve: bool, safe_mode
     }
 
     let mut cmd = Command::new("terragrunt");
-    cmd.arg("run-all")
-        .arg("apply")
+    cmd.arg("apply")
+        .arg("--all")
         .current_dir(&env_path)
-        .env("AWS_EC2_METADATA_DISABLED", "true");
+        .env("AWS_EC2_METADATA_DISABLED", "true")
+        .env("TF_IN_AUTOMATION", "true")
+        .env("CHECKPOINT_DISABLE", "true");
 
     if auto_approve {
         cmd.arg("-auto-approve");
@@ -1091,10 +1105,12 @@ pub fn destroy_terragrunt(provider: &str, env: &str, auto_approve: bool, safe_mo
     }
 
     let mut cmd = Command::new("terragrunt");
-    cmd.arg("run-all")
-        .arg("destroy")
+    cmd.arg("destroy")
+        .arg("--all")
         .current_dir(&env_path)
-        .env("AWS_EC2_METADATA_DISABLED", "true");
+        .env("AWS_EC2_METADATA_DISABLED", "true")
+        .env("TF_IN_AUTOMATION", "true")
+        .env("CHECKPOINT_DISABLE", "true");
 
     if auto_approve {
         cmd.arg("-auto-approve");

@@ -37,7 +37,7 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.9.8
+          terraform_version: 1.10.3
 
       - name: Set up Shell Test Env
         run: sudo apt-get install -y jq
@@ -81,6 +81,9 @@ jobs:
           REGION: "us-central1"
           # Suppress warnings for cleaner CI output
           RUSTFLAGS: "-A unused -A dead_code"
+          # Suppress Terraform version check warnings that break Terragrunt parsing
+          TF_IN_AUTOMATION: "true"
+          CHECKPOINT_DISABLE: "true"
 
       - name: Verify provider schemas were generated
         run: |
@@ -128,13 +131,19 @@ jobs:
         run: cargo run -- --plan tests/fixtures/gcp/out.json --modules tests/fixtures/gcp/modules.json --module-root simulator/gcp/modules --dry-run --working-directory envs/simulator/gcp/dev
         env:
           RUSTFLAGS: "-A unused -A dead_code"
+          TF_IN_AUTOMATION: "true"
+          CHECKPOINT_DISABLE: "true"
 
       - name: Dry run test - AWS modules
         run: cargo run -- --plan tests/fixtures/aws/out.json --modules tests/fixtures/aws/modules.json --module-root simulator/aws/modules --dry-run --working-directory envs/simulator/aws/dev
         env:
           RUSTFLAGS: "-A unused -A dead_code"
+          TF_IN_AUTOMATION: "true"
+          CHECKPOINT_DISABLE: "true"
 
       - name: Dry run test - Azure modules
         run: cargo run -- --plan tests/fixtures/azure/out.json --modules tests/fixtures/azure/modules.json --module-root simulator/azure/modules --dry-run --working-directory envs/simulator/azure/dev
         env:
           RUSTFLAGS: "-A unused -A dead_code"
+          TF_IN_AUTOMATION: "true"
+          CHECKPOINT_DISABLE: "true"
