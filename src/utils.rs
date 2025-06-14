@@ -388,14 +388,7 @@ pub fn clean_workspace(provider: Option<&str>, deep_clean: bool) -> Result<()> {
 /// 
 /// # Returns
 /// Result indicating success or failure of file creation
-fn create_minimal_plan_json(provider: &str) -> Result<()> {
-    let minimal_plan = r#"{"format_version":"1.2","terraform_version":"1.9.8","planned_values":{"root_module":{"child_modules":[]}}}"#;
-    let fixtures_dir = format!("tests/fixtures/{}", provider);
-    fs::create_dir_all(&fixtures_dir)?;
-    fs::write(format!("{}/out.json", fixtures_dir), minimal_plan)?;
-    println!("⚠️ Created minimal out.json for {} provider (plan failed)", provider);
-    Ok(())
-}
+
 
 /// Generates test fixtures for a specific cloud provider
 /// 
@@ -486,16 +479,13 @@ pub fn generate_fixtures(provider: &str) -> Result<()> {
     let cache_path = format!("{}/.terragrunt-cache", env_path);
     generate_modules_json(provider, &cache_path)?;
     
-    // Always try to find and convert existing .tfplan files first
-    // This handles cases where plan failed but we have tfplan files from previous runs
-    if let Ok(()) = generate_plan_json(provider, &cache_path) {
-        // Successfully found and converted .tfplan files
-    } else if !plan_output.status.success() {
+    if !plan_output.status.success() {
         let stderr = String::from_utf8_lossy(&plan_output.stderr);
-        eprintln!("⚠️ Warning: terragrunt plan failed for {}: {}", provider, stderr);
-        // Only create minimal plan file if we couldn't find any .tfplan files AND plan failed
-        create_minimal_plan_json(provider)?;
+        anyhow::bail!("Terragrunt plan failed for {}: {}", provider, stderr.trim());
     }
+    
+    // Plan succeeded, now convert real .tfplan files to JSON
+    generate_plan_json(provider, &cache_path)?;
 
     println!("✅ Fixtures generated successfully for {} provider", provider);
     Ok(())
@@ -636,8 +626,7 @@ fn generate_plan_json(provider: &str, cache_path: &str) -> Result<()> {
         }
     }
     
-    // If no plan file found or conversion failed, return an error
-    // Let the caller decide whether to create minimal JSON
+    // If no plan file found or conversion failed, return error
     anyhow::bail!("No .tfplan files found in {} or conversion failed", cache_path)
 }
 
