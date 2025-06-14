@@ -1,0 +1,34 @@
+{
+  "Modules": [
+    {
+      "Key": "",
+      "Source": "",
+      "Dir": "."
+    },
+    {
+      "Key": "storage",
+      "Source": "./modules/storage",
+      "Dir": "modules/storage"
+    },
+    {
+      "Key": "networking",
+      "Source": "./modules/networking", 
+      "Dir": "modules/networking"
+    },
+    {
+      "Key": "iam",
+      "Source": "./modules/iam",
+      "Dir": "modules/iam"
+    },
+    {
+      "Key": "gke",
+      "Source": "./modules/gke",
+      "Dir": "modules/gke"
+    },
+    {
+      "Key": "pubsub",
+      "Source": "./modules/pubsub",
+      "Dir": "modules/pubsub"
+    }
+  ]
+} 

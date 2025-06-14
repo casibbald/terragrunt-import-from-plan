@@ -42,6 +42,9 @@ out.tfplan
 out.json
 plan.tf
 modules.json
+# But allow baseline fixtures for CI
+!tests/fixtures/*/out.json
+!tests/fixtures/*/modules.json
 # Added by cargo
 
 /target

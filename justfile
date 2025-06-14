@@ -91,7 +91,44 @@ init-safe cloud=default_cloud env=default_env:
     cargo run -- init {{cloud}} --env {{env}} --safe
 
 # Run tests with fresh provider schemas for all cloud providers (AWS, GCP, Azure)
+# CI-friendly version that uses existing fixtures if available
 test-all:
+    cargo build
+    # Only clean if we're in local development (not CI)
+    @if [ -z "${CI}" ]; then \
+        echo "🧹 Local development detected - cleaning workspaces..."; \
+        cargo run -- clean gcp; \
+        cargo run -- clean aws; \
+        cargo run -- clean azure; \
+        echo "🚀 Initializing providers..."; \
+        cargo run -- init gcp --safe; \
+        cargo run -- init aws --safe; \
+        cargo run -- init azure --safe; \
+        echo "📋 Planning providers..."; \
+        cargo run -- plan gcp --safe; \
+        cargo run -- plan aws --safe; \
+        cargo run -- plan azure --safe; \
+        echo "🔧 Generating fresh fixtures..."; \
+        cargo run -- generate-fixtures gcp; \
+        cargo run -- generate-fixtures aws; \
+        cargo run -- generate-fixtures azure; \
+    else \
+        echo "🤖 CI environment detected - using existing fixtures..."; \
+        echo "📁 Checking for existing fixtures..."; \
+        if [ ! -f "tests/fixtures/aws/out.json" ] || [ ! -f "tests/fixtures/gcp/out.json" ] || [ ! -f "tests/fixtures/azure/out.json" ]; then \
+            echo "⚠️ Missing fixtures detected - attempting minimal generation..."; \
+            cargo run -- generate-fixtures gcp || echo "⚠️ GCP fixture generation failed (expected in CI)"; \
+            cargo run -- generate-fixtures aws || echo "⚠️ AWS fixture generation failed (expected in CI)"; \
+            cargo run -- generate-fixtures azure || echo "⚠️ Azure fixture generation failed (expected in CI)"; \
+        else \
+            echo "✅ All fixtures exist - proceeding with tests"; \
+        fi; \
+    fi
+    echo "🧪 Running tests..."
+    cargo test -- --test-threads=1
+
+# Original test-all command for local development
+test-all-local:
     cargo build
     cargo run -- clean gcp
     cargo run -- clean aws
@@ -106,7 +143,6 @@ test-all:
     cargo run -- generate-fixtures aws
     cargo run -- generate-fixtures azure
     cargo test -- --test-threads=1
-
 
 # Multi-cloud convenience commands
 run-gcp:
