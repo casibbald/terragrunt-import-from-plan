@@ -39,12 +39,13 @@ terraform.rc
 .terragrunt-cache/
 all.tf
 out.tfplan
+# Generated fixture files - these are created dynamically
+tests/fixtures/*/out.json
+tests/fixtures/*/modules.json
+# Other generated artifacts
 out.json
 plan.tf
 modules.json
-# But allow baseline fixtures for CI
-!tests/fixtures/*/out.json
-!tests/fixtures/*/modules.json
 # Added by cargo
 
 /target

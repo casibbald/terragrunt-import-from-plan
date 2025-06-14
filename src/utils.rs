@@ -499,46 +499,68 @@ pub fn generate_fixtures(provider: &str) -> Result<()> {
     Ok(())
 }
 
-/// Generates modules.json file for a provider's test fixtures
+/// Generates modules.json file from module directory structure
 /// 
-/// Creates a modules.json file by scanning the provider's module directory
-/// structure and generating appropriate module metadata. This internal function
-/// is used by the fixture generation process.
+/// This function dynamically discovers all modules by walking the filesystem
+/// and creates a modules.json file that matches terragrunt's expected format.
 /// 
 /// # Arguments
 /// * `provider` - Provider name (aws, gcp, azure)
-/// * `cache_path` - Path to terragrunt cache directory
+/// * `cache_path` - Path to terragrunt cache directory (currently unused)
 /// 
 /// # Returns
 /// Result indicating success or failure of modules.json generation
-fn generate_modules_json(provider: &str, cache_path: &str) -> Result<()> {
-    // Extract module information and create modules.json
-    let modules_json = format!(
-        r#"{{"Modules":[{{"Key":"","Source":"","Dir":"."}}{}]}}"#,
-        // Add modules based on actual directory structure
-        if Path::new(&format!("simulator/{}/modules", provider)).exists() {
-            let mut modules = Vec::new();
-            if let Ok(entries) = fs::read_dir(&format!("simulator/{}/modules", provider)) {
-                for entry in entries.flatten() {
-                    if entry.path().is_dir() {
-                        if let Some(module_name) = entry.file_name().to_str() {
-                            modules.push(format!(
-                                r#",{{"Key":"{}","Source":"./modules/{}","Dir":"modules/{}"}}"#,
+/// 
+/// # Module Discovery Methods
+/// This function uses filesystem-based discovery which works well because:
+/// - Fast and reliable (no external dependencies)
+/// - Always reflects current state
+/// - Provider-agnostic
+/// 
+/// Alternative approaches could include:
+/// - `terragrunt graph dependencies` for dependency-aware discovery
+/// - `terragrunt run-all plan --terragrunt-working-dir` for runtime discovery
+/// - Parsing `.terragrunt` files for more sophisticated module relationships
+fn generate_modules_json(provider: &str, _cache_path: &str) -> Result<()> {
+    let modules_path = format!("simulator/{}/modules", provider);
+    
+    // Start with root module in a vector
+    let mut all_modules = vec![r#"{"Key":"","Source":"","Dir":"."}"#.to_string()];
+    
+    // Dynamically discover all modules by walking the filesystem
+    if Path::new(&modules_path).exists() {
+        let mut discovered_modules = Vec::new();
+        
+        if let Ok(entries) = fs::read_dir(&modules_path) {
+            for entry in entries.flatten() {
+                if entry.path().is_dir() {
+                    if let Some(module_name) = entry.file_name().to_str() {
+                        // Skip hidden directories and common non-module directories
+                        if !module_name.starts_with('.') && !module_name.starts_with('_') {
+                            discovered_modules.push(format!(
+                                r#"{{"Key":"{}","Source":"./modules/{}","Dir":"modules/{}"}}"#,
                                 module_name, module_name, module_name
                             ));
                         }
                     }
                 }
             }
-            modules.join("")
-        } else {
-            String::new()
         }
-    );
+        
+        // Sort modules for consistent output
+        discovered_modules.sort();
+        all_modules.extend(discovered_modules);
+    }
+    
+    // Build proper JSON structure
+    let modules_json = format!(r#"{{"Modules":[{}]}}"#, all_modules.join(","));
 
+    // Write the dynamically generated modules.json
     let fixtures_dir = format!("tests/fixtures/{}", provider);
     fs::create_dir_all(&fixtures_dir)?;
     fs::write(format!("{}/modules.json", fixtures_dir), modules_json)?;
+    
+    println!("📁 Dynamically discovered and generated modules.json for {} provider", provider);
     
     Ok(())
 }
