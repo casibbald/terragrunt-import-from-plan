@@ -1,0 +1,36 @@
+# Terragrunt Import from Plan - Cursor Rules
+
+## Core Project Principles
+
+### 🎯 Real Infrastructure Only
+- **NEVER generate synthetic or fake JSON data**
+- **NEVER create minimal/placeholder terraform plan data**
+- **ONLY work with real .tfplan files from real terraform plans**
+- If `terragrunt plan` fails → **FAIL IMMEDIATELY** (do not create synthetic data)
+- If no real .tfplan files found → **FAIL IMMEDIATELY** (do not generate fake data)
+- This tool imports **real infrastructure** - synthetic data defeats the entire purpose
+
+### 🔧 Code Changes Protocol
+- **ASK BEFORE** removing or significantly modifying existing functions
+- **EXPLAIN REASONING** behind proposed changes before implementing
+- **CONFIRM APPROACH** aligns with project goals
+- Prefer editing existing files over creating new ones
+- Test changes thoroughly before committing
+
+### 📁 Project Structure
+- Dynamic fixture generation (not committed to git)
+- Use existing utilities in `src/utils.rs` effectively
+- Leverage recursive .tfplan file discovery
+- Convert .tfplan → JSON using `terragrunt show -json`
+
+### 🧪 Testing Standards
+- All integration tests must pass (currently 24/24)
+- Use real terraform plan data in tests
+- No synthetic test fixtures
+- Maintain backward compatibility
+
+### 🚀 CI/CD Requirements
+- Dynamic fixture generation in CI environments
+- Graceful handling of credential-less environments
+- Proper cleanup of generated artifacts
+- Use existing utilities rather than recreating functionality 
