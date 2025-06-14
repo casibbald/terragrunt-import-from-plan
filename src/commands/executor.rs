@@ -197,8 +197,17 @@ pub enum ImportExecutionError {
 /// 
 /// # Examples
 /// ```no_run
-/// use terragrunt_import_from_plan::commands::executor::{ImportExecutor, ImportCommand};
+/// use terragrunt_import_from_plan::commands::executor::{ImportExecutor, ImportCommand, ImportResult};
+/// use std::path::PathBuf;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let command = ImportCommand {
+///     working_directory: PathBuf::from("./modules/vpc"),
+///     resource_address: "aws_vpc.main".to_string(),
+///     resource_id: "vpc-12345".to_string(),
+///     resource_type: "aws_vpc".to_string(),
+///     module_name: "vpc".to_string(),
+/// };
 /// let executor = ImportExecutor;
 /// let result = executor.execute_command(&command)?;
 /// match result {
@@ -210,6 +219,8 @@ pub enum ImportExecutionError {
 ///     }
 ///     _ => {}
 /// }
+/// # Ok(())
+/// # }
 /// ```
 pub struct ImportExecutor;
 
@@ -239,8 +250,17 @@ impl ImportExecutor {
     /// 
     /// # Examples
     /// ```no_run
-    /// use terragrunt_import_from_plan::commands::executor::ImportExecutor;
+    /// use terragrunt_import_from_plan::commands::executor::{ImportExecutor, ImportCommand, ImportResult};
+    /// use std::path::PathBuf;
     /// 
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let command = ImportCommand {
+    ///     working_directory: PathBuf::from("./modules/vpc"),
+    ///     resource_address: "aws_vpc.main".to_string(),
+    ///     resource_id: "vpc-12345".to_string(),
+    ///     resource_type: "aws_vpc".to_string(),
+    ///     module_name: "vpc".to_string(),
+    /// };
     /// let executor = ImportExecutor;
     /// match executor.execute_command(&command)? {
     ///     ImportResult::Success { address, execution_time_ms } => {
@@ -252,6 +272,8 @@ impl ImportExecutor {
     ///     }
     ///     _ => unreachable!(),
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn execute_command(&self, command: &ImportCommand) -> Result<ImportResult, ImportExecutionError> {
         if !command.working_directory.exists() {
@@ -313,8 +335,16 @@ impl ImportExecutor {
     /// 
     /// # Examples
     /// ```no_run
-    /// use terragrunt_import_from_plan::commands::executor::ImportExecutor;
+    /// use terragrunt_import_from_plan::commands::executor::{ImportExecutor, ImportCommand, ImportResult};
+    /// use std::path::PathBuf;
     /// 
+    /// let commands = vec![ImportCommand {
+    ///     working_directory: PathBuf::from("./modules/vpc"),
+    ///     resource_address: "aws_vpc.main".to_string(),
+    ///     resource_id: "vpc-12345".to_string(),
+    ///     resource_type: "aws_vpc".to_string(),
+    ///     module_name: "vpc".to_string(),
+    /// }];
     /// let executor = ImportExecutor;
     /// let result = executor.execute_batch(&commands);
     /// 
@@ -380,8 +410,16 @@ impl ImportExecutor {
     /// 
     /// # Examples
     /// ```no_run
-    /// use terragrunt_import_from_plan::commands::executor::ImportExecutor;
+    /// use terragrunt_import_from_plan::commands::executor::{ImportExecutor, ImportCommand, ImportResult};
+    /// use std::path::PathBuf;
     /// 
+    /// let command = ImportCommand {
+    ///     working_directory: PathBuf::from("./modules/vpc"),
+    ///     resource_address: "aws_vpc.main".to_string(),
+    ///     resource_id: "vpc-12345".to_string(),
+    ///     resource_type: "aws_vpc".to_string(),
+    ///     module_name: "vpc".to_string(),
+    /// };
     /// let executor = ImportExecutor;
     /// let result = executor.dry_run_command(&command);
     /// 
@@ -418,8 +456,16 @@ impl ImportExecutor {
     /// 
     /// # Examples
     /// ```no_run
-    /// use terragrunt_import_from_plan::commands::executor::ImportExecutor;
+    /// use terragrunt_import_from_plan::commands::executor::{ImportExecutor, ImportCommand, ImportResult};
+    /// use std::path::PathBuf;
     /// 
+    /// let commands = vec![ImportCommand {
+    ///     working_directory: PathBuf::from("./modules/vpc"),
+    ///     resource_address: "aws_vpc.main".to_string(),
+    ///     resource_id: "vpc-12345".to_string(),
+    ///     resource_type: "aws_vpc".to_string(),
+    ///     module_name: "vpc".to_string(),
+    /// }];
     /// let executor = ImportExecutor;
     /// let dry_run_results = executor.dry_run_batch(&commands);
     /// 
