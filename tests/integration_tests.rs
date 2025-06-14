@@ -419,7 +419,7 @@ fn test_17_validate_module_dirs() {
     let data = fs::read_to_string("tests/fixtures/modules.json").expect("Unable to read file");
     let modules_file: ModulesFile = serde_json::from_str(&data).expect("Invalid JSON");
 
-    let errors = validate_module_dirs(&modules_file.modules, Path::new("simulator"));
+    let errors = validate_module_dirs(&modules_file.modules, Path::new("simulator/gcp"));
 
     assert!(errors.is_empty(), "Found invalid directories: {:?}", errors);
 }
