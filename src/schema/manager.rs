@@ -405,7 +405,7 @@ impl SchemaManager {
     /// and other metadata useful for intelligent ID inference and validation.
     /// 
     /// # Arguments
-    /// * `resource_type` - Resource type to analyze (e.g., "google_storage_bucket")
+    /// * `resource_type` - Resource type to analyze (e.g., "google_storage_bucket", "aws_s3_bucket")
     /// 
     /// # Returns
     /// Map of attribute names to their detailed metadata
@@ -436,24 +436,33 @@ impl SchemaManager {
                 message: "No schema loaded. Call load_or_generate_schema() first.".to_string() 
             })?;
 
+        // Auto-detect provider from resource type
+        let provider_name = if resource_type.starts_with("google_") {
+            "registry.terraform.io/hashicorp/google"
+        } else if resource_type.starts_with("aws_") {
+            "registry.terraform.io/hashicorp/aws"
+        } else if resource_type.starts_with("azurerm_") {
+            "registry.terraform.io/hashicorp/azurerm"
+        } else if resource_type.starts_with("random_") {
+            "registry.terraform.io/hashicorp/random"
+        } else {
+            // Try to detect from loaded providers
+            return self.find_resource_in_any_provider(resource_type);
+        };
+
         // Navigate to the resource schema: 
-        // .provider_schemas["registry.terraform.io/hashicorp/google"].resource_schemas[resource_type].block.attributes
+        // .provider_schemas[provider_name].resource_schemas[resource_type].block.attributes
         let resource_schema = schema
             .get("provider_schemas")
             .and_then(|ps| ps.as_object())
-            .and_then(|ps_obj| {
-                // Try different provider name patterns
-                ps_obj.get("registry.terraform.io/hashicorp/google")
-                    .or_else(|| ps_obj.get("google"))
-                    .or_else(|| ps_obj.values().next()) // Fallback to first provider
-            })
+            .and_then(|ps_obj| ps_obj.get(provider_name))
             .and_then(|provider| provider.get("resource_schemas"))
             .and_then(|rs| rs.get(resource_type))
             .and_then(|resource| resource.get("block"))
             .and_then(|block| block.get("attributes"))
             .and_then(|attrs| attrs.as_object())
             .ok_or_else(|| AttributeMetadataError::ParseError {
-                message: format!("Could not find attributes for resource type: {}", resource_type)
+                message: format!("Could not find attributes for resource type: {} in provider: {}", resource_type, provider_name)
             })?;
 
         // Parse each attribute into AttributeMetadata
@@ -557,14 +566,14 @@ impl SchemaManager {
         Ok(candidates)
     }
 
-    /// Lists all available resource types in the loaded schema
+    /// Lists all available resource types in the loaded schema across all providers
     /// 
-    /// This method extracts all resource type names from the loaded provider schema,
+    /// This method extracts all resource type names from all loaded provider schemas,
     /// which can be useful for discovery, validation, or building resource type
     /// selection interfaces.
     /// 
     /// # Returns
-    /// Vector of all resource type names found in the schema
+    /// Vector of all resource type names found across all providers in the schema
     /// 
     /// # Errors
     /// - No schema loaded (call load_or_generate_schema() first)
@@ -591,22 +600,83 @@ impl SchemaManager {
                 message: "No schema loaded. Call load_or_generate_schema() first.".to_string() 
             })?;
 
-        let resource_types = schema
-            .get("provider_schemas")
-            .and_then(|ps| ps.as_object())
-            .and_then(|ps_obj| {
-                // Try different provider name patterns
-                ps_obj.get("registry.terraform.io/hashicorp/google")
-                    .or_else(|| ps_obj.get("google"))
-                    .or_else(|| ps_obj.values().next())
-            })
-            .and_then(|provider| provider.get("resource_schemas"))
-            .and_then(|rs| rs.as_object())
-            .map(|rs_obj| rs_obj.keys().cloned().collect())
-            .ok_or_else(|| AttributeMetadataError::ParseError {
-                message: "Could not extract resource types from schema".to_string()
+        let mut all_resource_types = Vec::new();
+
+        // Collect resource types from all providers
+        if let Some(provider_schemas) = schema.get("provider_schemas").and_then(|ps| ps.as_object()) {
+            for (_provider_name, provider_data) in provider_schemas {
+                if let Some(resource_schemas) = provider_data.get("resource_schemas").and_then(|rs| rs.as_object()) {
+                    for resource_type in resource_schemas.keys() {
+                        all_resource_types.push(resource_type.clone());
+                    }
+                }
+            }
+        }
+
+        if all_resource_types.is_empty() {
+            return Err(AttributeMetadataError::ParseError {
+                message: "No resource types found in any provider schema".to_string()
+            });
+        }
+
+        // Sort for consistent output
+        all_resource_types.sort();
+        
+        Ok(all_resource_types)
+    }
+
+    /// Helper method to find a resource type in any available provider
+    /// 
+    /// This method searches through all loaded providers to find the specified
+    /// resource type when it can't be detected from the resource name prefix.
+    /// 
+    /// # Arguments
+    /// * `resource_type` - Resource type to search for
+    /// 
+    /// # Returns
+    /// Map of attribute names to their detailed metadata
+    /// 
+    /// # Errors
+    /// - Resource type not found in any provider
+    /// - Schema parsing errors
+    fn find_resource_in_any_provider(&self, resource_type: &str) -> Result<ResourceAttributeMap, AttributeMetadataError> {
+        let mut attributes = HashMap::new();
+        
+        // Get the cached schema
+        let schema = self.cache.get("provider_schema")
+            .ok_or_else(|| AttributeMetadataError::ParseError { 
+                message: "No schema loaded. Call load_or_generate_schema() first.".to_string() 
             })?;
 
-        Ok(resource_types)
+        // Search through all providers for this resource type
+        if let Some(provider_schemas) = schema.get("provider_schemas").and_then(|ps| ps.as_object()) {
+            for (provider_name, provider_data) in provider_schemas {
+                if let Some(resource_schema) = provider_data
+                    .get("resource_schemas")
+                    .and_then(|rs| rs.get(resource_type))
+                    .and_then(|resource| resource.get("block"))
+                    .and_then(|block| block.get("attributes"))
+                    .and_then(|attrs| attrs.as_object())
+                {
+                    // Found the resource in this provider
+                    for (attr_name, attr_value) in resource_schema {
+                        match AttributeMetadata::from_schema_value(attr_value) {
+                            Ok(metadata) => {
+                                attributes.insert(attr_name.clone(), metadata);
+                            }
+                            Err(e) => {
+                                eprintln!("⚠️ Warning: Failed to parse attribute '{}' for resource '{}' in provider '{}': {}", 
+                                    attr_name, resource_type, provider_name, e);
+                            }
+                        }
+                    }
+                    return Ok(attributes);
+                }
+            }
+        }
+
+        Err(AttributeMetadataError::ParseError {
+            message: format!("Resource type '{}' not found in any loaded provider", resource_type)
+        })
     }
 } 
