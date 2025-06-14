@@ -83,7 +83,10 @@ pub enum SchemaError {
 /// use terragrunt_import_from_plan::schema::write_provider_schema;
 /// use std::path::Path;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// write_provider_schema(Path::new("./envs/dev"))?;
+/// # Ok(())
+/// # }
 /// ```
 pub fn write_provider_schema(dir: &Path) -> Result<(), SchemaError> {
     let output = Command::new("terragrunt")

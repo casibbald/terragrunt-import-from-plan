@@ -461,10 +461,22 @@ impl IdScoringStrategy for DefaultScoringStrategy {
 /// # Examples
 /// ```no_run
 /// use terragrunt_import_from_plan::scoring::strategies::{create_scoring_strategy, detect_provider_from_resource_type};
+/// use terragrunt_import_from_plan::schema::metadata::AttributeMetadata;
 /// 
 /// // Auto-detect and create strategy
 /// let provider = detect_provider_from_resource_type("google_storage_bucket");
 /// let strategy = create_scoring_strategy(provider);
+/// 
+/// // Create sample metadata for testing
+/// let metadata = AttributeMetadata {
+///     required: true,
+///     computed: false,
+///     optional: false,
+///     attr_type: "string".to_string(),
+///     description: Some("Resource name".to_string()),
+///     description_kind: None,
+///     sensitive: None,
+/// };
 /// 
 /// // Use strategy to score attributes
 /// let score = strategy.score_attribute_with_metadata("name", &metadata, "google_storage_bucket");

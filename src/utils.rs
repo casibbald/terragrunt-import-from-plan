@@ -105,6 +105,7 @@ pub enum TerragruntProcessError {
 /// let root_module = PlannedModule {
 ///     resources: Some(vec![]),
 ///     child_modules: None,
+///     address: None,
 /// };
 /// let mut all_resources = Vec::new();
 /// collect_resources(&root_module, &mut all_resources);

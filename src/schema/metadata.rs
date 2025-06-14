@@ -53,6 +53,7 @@ use std::collections::HashMap;
 /// use terragrunt_import_from_plan::schema::metadata::AttributeMetadata;
 /// use serde_json::json;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let schema = json!({
 ///     "type": "string",
 ///     "description": "The unique identifier for the resource",
@@ -63,6 +64,8 @@ use std::collections::HashMap;
 /// let metadata = AttributeMetadata::from_schema_value(&schema)?;
 /// println!("Base score: {}", metadata.calculate_base_score());
 /// println!("Potential ID: {}", metadata.is_potential_id());
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AttributeMetadata {
@@ -143,22 +146,25 @@ impl AttributeMetadata {
     /// - Type mismatches are handled gracefully where possible
     /// 
     /// # Examples
-    /// ```no_run
-    /// use terragrunt_import_from_plan::schema::metadata::AttributeMetadata;
-    /// use serde_json::json;
-    /// 
-    /// let schema = json!({
-    ///     "type": "string",
-    ///     "description": "The resource name",
-    ///     "required": true,
-    ///     "computed": false
-    /// });
-    /// 
-    /// let metadata = AttributeMetadata::from_schema_value(&schema)?;
-    /// assert_eq!(metadata.attr_type, "string");
-    /// assert!(metadata.required);
-    /// assert!(!metadata.computed);
-    /// ```
+/// ```no_run
+/// use terragrunt_import_from_plan::schema::metadata::AttributeMetadata;
+/// use serde_json::json;
+/// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let schema = json!({
+///     "type": "string",
+///     "description": "The resource name",
+///     "required": true,
+///     "computed": false
+/// });
+/// 
+/// let metadata = AttributeMetadata::from_schema_value(&schema)?;
+/// assert_eq!(metadata.attr_type, "string");
+/// assert!(metadata.required);
+/// assert!(!metadata.computed);
+/// # Ok(())
+/// # }
+/// ```
     pub fn from_schema_value(value: &serde_json::Value) -> Result<Self, AttributeMetadataError> {
         let required = value.get("required").and_then(|v| v.as_bool()).unwrap_or(false);
         let computed = value.get("computed").and_then(|v| v.as_bool()).unwrap_or(false);
@@ -220,12 +226,14 @@ impl AttributeMetadata {
     /// 
     /// // High-scoring ID field
     /// let id_field = AttributeMetadata {
-    ///     required: true,          // +15.0
-    ///     computed: true,          // +10.0
-    ///     attr_type: "string".to_string(),  // +5.0
-    ///     description: Some("Unique identifier".to_string()), // +8.0
-    ///     // ... other fields
-    /// };
+///     required: true,          // +15.0
+///     computed: true,          // +10.0
+///     optional: false,
+///     attr_type: "string".to_string(),  // +5.0
+///     description: Some("Unique identifier".to_string()), // +8.0
+///     description_kind: None,
+///     sensitive: None,
+/// };
     /// 
     /// let score = id_field.calculate_base_score();
     /// // Score = 30.0 + 15.0 + 10.0 + 5.0 + 8.0 = 68.0
@@ -286,31 +294,40 @@ impl AttributeMetadata {
     /// use terragrunt_import_from_plan::schema::metadata::AttributeMetadata;
     /// 
     /// // Good ID candidate
-    /// let good_candidate = AttributeMetadata {
-    ///     required: true,
-    ///     computed: false,
-    ///     attr_type: "string".to_string(),
-    ///     // ... other fields
-    /// };
-    /// assert!(good_candidate.is_potential_id());
-    /// 
-    /// // Poor ID candidate (wrong type)
-    /// let poor_candidate = AttributeMetadata {
-    ///     required: true,
-    ///     computed: false,
-    ///     attr_type: "bool".to_string(),  // Not a string
-    ///     // ... other fields
-    /// };
-    /// assert!(!poor_candidate.is_potential_id());
-    /// 
-    /// // Poor ID candidate (not important)
-    /// let optional_field = AttributeMetadata {
-    ///     required: false,     // Not required
-    ///     computed: false,     // Not computed
-    ///     attr_type: "string".to_string(),
-    ///     // ... other fields
-    /// };
-    /// assert!(!optional_field.is_potential_id());
+/// let good_candidate = AttributeMetadata {
+///     required: true,
+///     computed: false,
+///     optional: false,
+///     attr_type: "string".to_string(),
+///     description: None,
+///     description_kind: None,
+///     sensitive: None,
+/// };
+/// assert!(good_candidate.is_potential_id());
+/// 
+/// // Poor ID candidate (wrong type)
+/// let poor_candidate = AttributeMetadata {
+///     required: true,
+///     computed: false,
+///     optional: false,
+///     attr_type: "bool".to_string(),  // Not a string
+///     description: None,
+///     description_kind: None,
+///     sensitive: None,
+/// };
+/// assert!(!poor_candidate.is_potential_id());
+/// 
+/// // Poor ID candidate (not important)
+/// let optional_field = AttributeMetadata {
+///     required: false,     // Not required
+///     computed: false,     // Not computed
+///     optional: true,
+///     attr_type: "string".to_string(),
+///     description: None,
+///     description_kind: None,
+///     sensitive: None,
+/// };
+/// assert!(!optional_field.is_potential_id());
     /// ```
     pub fn is_potential_id(&self) -> bool {
         // Must be a string type for most ID use cases

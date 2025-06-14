@@ -35,9 +35,12 @@ use crate::schema::{write_provider_schema, AttributeMetadata, ResourceAttributeM
 /// ```no_run
 /// use terragrunt_import_from_plan::schema::SchemaManager;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut manager = SchemaManager::new("./envs/dev");
 /// let schema = manager.load_or_generate_schema()?;
 /// let candidates = manager.extract_id_candidates("google_storage_bucket");
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct SchemaManager {
@@ -90,14 +93,17 @@ impl SchemaManager {
     /// - Failed to generate new schema via terragrunt
     /// 
     /// # Examples
-    /// ```no_run
-    /// use terragrunt_import_from_plan::schema::SchemaManager;
-    /// 
-    /// let mut manager = SchemaManager::new("./envs/dev");
-    /// let schema = manager.load_or_generate_schema()?;
-    /// println!("Loaded schema with {} providers", 
-    ///          schema.get("provider_schemas").unwrap().as_object().unwrap().len());
-    /// ```
+/// ```no_run
+/// use terragrunt_import_from_plan::schema::SchemaManager;
+/// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let mut manager = SchemaManager::new("./envs/dev");
+/// let schema = manager.load_or_generate_schema()?;
+/// println!("Loaded schema with {} providers", 
+///          schema.get("provider_schemas").unwrap().as_object().unwrap().len());
+/// # Ok(())
+/// # }
+/// ```
     pub fn load_or_generate_schema(&mut self) -> Result<&Value> {
         // Check if we have it cached
         if self.cache.contains_key("provider_schema") {
@@ -225,12 +231,24 @@ impl SchemaManager {
     /// HashMap mapping resource types to their schema definitions
     /// 
     /// # Examples
-    /// ```no_run
-    /// use terragrunt_import_from_plan::schema::SchemaManager;
-    /// 
-    /// let schema_map = SchemaManager::extract_schema_map_from_plan(&plan);
-    /// println!("Extracted {} resource schemas", schema_map.len());
-    /// ```
+/// ```no_run
+/// use terragrunt_import_from_plan::schema::SchemaManager;
+/// use terragrunt_import_from_plan::importer::PlanFile;
+/// use serde_json::json;
+/// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let plan = PlanFile {
+///     format_version: "1.0".to_string(),
+///     terraform_version: "1.0".to_string(),
+///     variables: None,
+///     planned_values: None,
+///     provider_schemas: None,
+/// };
+/// let schema_map = SchemaManager::extract_schema_map_from_plan(&plan);
+/// println!("Extracted {} resource schemas", schema_map.len());
+/// # Ok(())
+/// # }
+/// ```
     pub fn extract_schema_map_from_plan(plan: &PlanFile) -> HashMap<String, Value> {
         plan.provider_schemas
             .as_ref()
@@ -257,12 +275,29 @@ impl SchemaManager {
     /// for backward compatibility.
     /// 
     /// # Examples
-    /// ```no_run
-    /// use terragrunt_import_from_plan::schema::SchemaManager;
-    /// 
-    /// let candidates = SchemaManager::extract_id_candidate_fields_from_schema(&schema_json);
-    /// println!("Found {} total candidate fields", candidates.len());
-    /// ```
+/// ```no_run
+/// use terragrunt_import_from_plan::schema::SchemaManager;
+/// use serde_json::json;
+/// 
+/// let schema_json = json!({
+///     "provider_schemas": {
+///         "google": {
+///             "resource_schemas": {
+///                 "google_storage_bucket": {
+///                     "block": {
+///                         "attributes": {
+///                             "name": {},
+///                             "location": {}
+///                         }
+///                     }
+///                 }
+///             }
+///         }
+///     }
+/// });
+/// let candidates = SchemaManager::extract_id_candidate_fields_from_schema(&schema_json);
+/// println!("Found {} total candidate fields", candidates.len());
+/// ```
     pub fn extract_id_candidate_fields_from_schema(schema_json: &Value) -> HashSet<String> {
         let mut candidates = HashSet::new();
 
@@ -300,12 +335,18 @@ impl SchemaManager {
     /// Set of attribute names with simple types that could be ID candidates
     /// 
     /// # Examples
-    /// ```no_run
-    /// use terragrunt_import_from_plan::schema::SchemaManager;
-    /// 
-    /// let candidates = SchemaManager::extract_id_candidates_from_values(&resource_values);
-    /// println!("Found {} potential ID fields from values", candidates.len());
-    /// ```
+/// ```no_run
+/// use terragrunt_import_from_plan::schema::SchemaManager;
+/// use serde_json::{Map, Value, json};
+/// 
+/// let mut resource_values = Map::new();
+/// resource_values.insert("name".to_string(), json!("my-bucket"));
+/// resource_values.insert("location".to_string(), json!("us-central1"));
+/// resource_values.insert("description".to_string(), json!("Test bucket"));
+/// 
+/// let candidates = SchemaManager::extract_id_candidates_from_values(&resource_values);
+/// println!("Found {} potential ID fields from values", candidates.len());
+/// ```
     pub fn extract_id_candidates_from_values(values: &serde_json::Map<String, Value>) -> HashSet<String> {
         let mut fields = HashSet::new();
 
@@ -375,14 +416,17 @@ impl SchemaManager {
     /// - Schema parsing errors
     /// 
     /// # Examples
-    /// ```no_run
-    /// use terragrunt_import_from_plan::schema::SchemaManager;
-    /// 
-    /// let mut manager = SchemaManager::new("./envs/dev");
-    /// manager.load_or_generate_schema()?;
-    /// let attributes = manager.parse_resource_attributes("google_storage_bucket")?;
-    /// println!("Found {} attributes", attributes.len());
-    /// ```
+/// ```no_run
+/// use terragrunt_import_from_plan::schema::SchemaManager;
+/// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let mut manager = SchemaManager::new("./envs/dev");
+/// manager.load_or_generate_schema()?;
+/// let attributes = manager.parse_resource_attributes("google_storage_bucket")?;
+/// println!("Found {} attributes", attributes.len());
+/// # Ok(())
+/// # }
+/// ```
     pub fn parse_resource_attributes(&self, resource_type: &str) -> Result<ResourceAttributeMap, AttributeMetadataError> {
         let mut attributes = HashMap::new();
         
@@ -447,15 +491,18 @@ impl SchemaManager {
     /// - Schema parsing errors
     /// 
     /// # Examples
-    /// ```no_run
-    /// use terragrunt_import_from_plan::schema::SchemaManager;
-    /// 
-    /// let mut manager = SchemaManager::new("./envs/dev");
-    /// manager.load_or_generate_schema()?;
-    /// if let Some(metadata) = manager.get_attribute_metadata("google_storage_bucket", "name")? {
-    ///     println!("Attribute 'name' score: {}", metadata.calculate_base_score());
-    /// }
-    /// ```
+/// ```no_run
+/// use terragrunt_import_from_plan::schema::SchemaManager;
+/// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let mut manager = SchemaManager::new("./envs/dev");
+/// manager.load_or_generate_schema()?;
+/// if let Some(metadata) = manager.get_attribute_metadata("google_storage_bucket", "name")? {
+///     println!("Attribute 'name' score: {}", metadata.calculate_base_score());
+/// }
+/// # Ok(())
+/// # }
+/// ```
     pub fn get_attribute_metadata(&self, resource_type: &str, attr_name: &str) -> Result<Option<AttributeMetadata>, AttributeMetadataError> {
         let attributes = self.parse_resource_attributes(resource_type)?;
         Ok(attributes.get(attr_name).cloned())
@@ -479,16 +526,19 @@ impl SchemaManager {
     /// - Schema parsing errors
     /// 
     /// # Examples
-    /// ```no_run
-    /// use terragrunt_import_from_plan::schema::SchemaManager;
-    /// 
-    /// let mut manager = SchemaManager::new("./envs/dev");
-    /// manager.load_or_generate_schema()?;
-    /// let candidates = manager.get_id_candidate_attributes("google_storage_bucket")?;
-    /// for (name, metadata) in candidates.iter().take(3) {
-    ///     println!("Candidate: {} (score: {})", name, metadata.calculate_base_score());
-    /// }
-    /// ```
+/// ```no_run
+/// use terragrunt_import_from_plan::schema::SchemaManager;
+/// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let mut manager = SchemaManager::new("./envs/dev");
+/// manager.load_or_generate_schema()?;
+/// let candidates = manager.get_id_candidate_attributes("google_storage_bucket")?;
+/// for (name, metadata) in candidates.iter().take(3) {
+///     println!("Candidate: {} (score: {})", name, metadata.calculate_base_score());
+/// }
+/// # Ok(())
+/// # }
+/// ```
     pub fn get_id_candidate_attributes(&self, resource_type: &str) -> Result<Vec<(String, AttributeMetadata)>, AttributeMetadataError> {
         let attributes = self.parse_resource_attributes(resource_type)?;
         
@@ -521,17 +571,20 @@ impl SchemaManager {
     /// - Failed to extract resource types from schema
     /// 
     /// # Examples
-    /// ```no_run
-    /// use terragrunt_import_from_plan::schema::SchemaManager;
-    /// 
-    /// let mut manager = SchemaManager::new("./envs/dev");
-    /// manager.load_or_generate_schema()?;
-    /// let resource_types = manager.list_resource_types()?;
-    /// println!("Available resource types: {}", resource_types.len());
-    /// for resource_type in resource_types.iter().take(5) {
-    ///     println!("  - {}", resource_type);
-    /// }
-    /// ```
+/// ```no_run
+/// use terragrunt_import_from_plan::schema::SchemaManager;
+/// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let mut manager = SchemaManager::new("./envs/dev");
+/// manager.load_or_generate_schema()?;
+/// let resource_types = manager.list_resource_types()?;
+/// println!("Available resource types: {}", resource_types.len());
+/// for resource_type in resource_types.iter().take(5) {
+///     println!("  - {}", resource_type);
+/// }
+/// # Ok(())
+/// # }
+/// ```
     pub fn list_resource_types(&self) -> Result<Vec<String>, AttributeMetadataError> {
         let schema = self.cache.get("provider_schema")
             .ok_or_else(|| AttributeMetadataError::ParseError { 

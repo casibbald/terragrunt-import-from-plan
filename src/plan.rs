@@ -147,6 +147,7 @@ use anyhow::{Result, Context};
 /// use terragrunt_import_from_plan::plan::load_provider_schema;
 /// use std::path::Path;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let schema = load_provider_schema(Path::new("provider-schema.json"))?;
 /// 
 /// // Access schema for a specific resource type
@@ -155,6 +156,8 @@ use anyhow::{Result, Context};
 ///         println!("Found {} attributes for google_storage_bucket", bucket_schema.len());
 ///     }
 /// }
+/// # Ok(())
+/// # }
 /// ```
 pub fn load_provider_schema(schema_path: &Path) -> Result<HashMap<String, HashMap<String, HashMap<String, Value>>>> {
     let schema_content = fs::read_to_string(schema_path)
@@ -223,6 +226,7 @@ pub fn load_provider_schema(schema_path: &Path) -> Result<HashMap<String, HashMa
 /// use std::collections::HashMap;
 /// use serde_json::json;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut attributes = HashMap::new();
 /// attributes.insert("id".to_string(), json!({"type": "string", "computed": true}));
 /// attributes.insert("name".to_string(), json!({"type": "string", "required": true}));
@@ -232,6 +236,8 @@ pub fn load_provider_schema(schema_path: &Path) -> Result<HashMap<String, HashMa
 /// // "id" should have the highest score
 /// assert_eq!(scores.get("id"), Some(&100.0));
 /// assert_eq!(scores.get("name"), Some(&90.0));
+/// # Ok(())
+/// # }
 /// ```
 pub fn score_attributes_for_id(_resource_type: &str, attributes: &HashMap<String, Value>) -> Result<HashMap<String, f64>> {
     let mut scores = HashMap::new();

@@ -82,12 +82,54 @@ impl ImportCommandBuilder {
     /// ImportCommand object ready for execution
     /// 
     /// # Examples
-    /// ```no_run
-    /// use terragrunt_import_from_plan::commands::builder::ImportCommandBuilder;
-    /// 
-    /// let builder = ImportCommandBuilder::new("./modules");
-    /// let command = builder.build_command(&resource_with_id, &module_meta);
-    /// ```
+/// ```no_run
+/// use terragrunt_import_from_plan::commands::builder::ImportCommandBuilder;
+/// use terragrunt_import_from_plan::importer::{ResourceWithId, ModuleMeta, Resource};
+/// use terragrunt_import_from_plan::plan::TerraformResource;
+/// use std::path::PathBuf;
+/// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let builder = ImportCommandBuilder::new("./modules");
+/// 
+/// // Create sample resource data for testing
+/// let resource = Resource {
+///     address: "module.test.aws_vpc.main".to_string(),
+///     mode: "managed".to_string(),
+///     r#type: "aws_vpc".to_string(),
+///     name: "main".to_string(),
+///     provider_name: None,
+///     schema_version: None,
+///     values: None,
+///     sensitive_values: None,
+///     depends_on: None,
+/// };
+/// 
+/// let terraform_resource = TerraformResource {
+///     address: "module.test.aws_vpc.main".to_string(),
+///     mode: "managed".to_string(),
+///     r#type: "aws_vpc".to_string(),
+///     name: "main".to_string(),
+///     values: None,
+/// };
+/// 
+/// let module_meta = ModuleMeta {
+///     key: "test".to_string(),
+///     source: "./modules/test".to_string(),
+///     dir: "modules/test".to_string(),
+/// };
+/// 
+/// let resource_with_id = ResourceWithId {
+///     resource: &resource,
+///     terraform_resource,
+///     id: "vpc-12345".to_string(),
+///     module_meta: &module_meta,
+///     module_path: PathBuf::from("./modules/test"),
+/// };
+/// 
+/// let command = builder.build_command(&resource_with_id, &module_meta);
+/// # Ok(())
+/// # }
+/// ```
     pub fn build_command(&self, resource: &ResourceWithId, module: &ModuleMeta) -> ImportCommand {
         let full_path = self.module_root.join(&module.dir);
         
@@ -113,13 +155,53 @@ impl ImportCommandBuilder {
     /// Vector of ImportCommand objects, one for each input resource
     /// 
     /// # Examples
-    /// ```no_run
-    /// use terragrunt_import_from_plan::commands::builder::ImportCommandBuilder;
-    /// 
-    /// let builder = ImportCommandBuilder::new("./modules");
-    /// let commands = builder.build_all_commands(&resource_list);
-    /// println!("Generated {} import commands", commands.len());
-    /// ```
+/// ```no_run
+/// use terragrunt_import_from_plan::commands::builder::ImportCommandBuilder;
+/// use terragrunt_import_from_plan::importer::{ResourceWithId, ModuleMeta, Resource};
+/// use terragrunt_import_from_plan::plan::TerraformResource;
+/// use std::path::PathBuf;
+/// 
+/// let builder = ImportCommandBuilder::new("./modules");
+/// 
+/// // Create sample resource data for testing
+/// let resource1 = Resource {
+///     address: "module.test.aws_vpc.main".to_string(),
+///     mode: "managed".to_string(),
+///     r#type: "aws_vpc".to_string(),
+///     name: "main".to_string(),
+///     provider_name: None,
+///     schema_version: None,
+///     values: None,
+///     sensitive_values: None,
+///     depends_on: None,
+/// };
+/// 
+/// let terraform_resource1 = TerraformResource {
+///     address: "module.test.aws_vpc.main".to_string(),
+///     mode: "managed".to_string(),
+///     r#type: "aws_vpc".to_string(),
+///     name: "main".to_string(),
+///     values: None,
+/// };
+/// 
+/// let module_meta1 = ModuleMeta {
+///     key: "test".to_string(),
+///     source: "./modules/test".to_string(),
+///     dir: "modules/test".to_string(),
+/// };
+/// 
+/// let resource_with_id1 = ResourceWithId {
+///     resource: &resource1,
+///     terraform_resource: terraform_resource1,
+///     id: "vpc-12345".to_string(),
+///     module_meta: &module_meta1,
+///     module_path: PathBuf::from("./modules/test"),
+/// };
+/// 
+/// let resource_list = vec![resource_with_id1];
+/// let commands = builder.build_all_commands(&resource_list);
+/// println!("Generated {} import commands", commands.len());
+/// ```
     pub fn build_all_commands(&self, resources: &[ResourceWithId]) -> Vec<ImportCommand> {
         resources
             .iter()
@@ -143,13 +225,52 @@ impl ImportCommandBuilder {
     /// `terragrunt import -config-dir={module_path} {resource_address} {resource_id}`
     /// 
     /// # Examples
-    /// ```no_run
-    /// use terragrunt_import_from_plan::commands::builder::ImportCommandBuilder;
-    /// 
-    /// let builder = ImportCommandBuilder::new("./modules");
-    /// let command_str = builder.build_command_string(&resource_with_id);
-    /// println!("Would execute: {}", command_str);
-    /// ```
+/// ```no_run
+/// use terragrunt_import_from_plan::commands::builder::ImportCommandBuilder;
+/// use terragrunt_import_from_plan::importer::{ResourceWithId, ModuleMeta, Resource};
+/// use terragrunt_import_from_plan::plan::TerraformResource;
+/// use std::path::PathBuf;
+/// 
+/// let builder = ImportCommandBuilder::new("./modules");
+/// 
+/// // Create sample resource data for testing
+/// let resource = Resource {
+///     address: "module.test.aws_vpc.main".to_string(),
+///     mode: "managed".to_string(),
+///     r#type: "aws_vpc".to_string(),
+///     name: "main".to_string(),
+///     provider_name: None,
+///     schema_version: None,
+///     values: None,
+///     sensitive_values: None,
+///     depends_on: None,
+/// };
+/// 
+/// let terraform_resource = TerraformResource {
+///     address: "module.test.aws_vpc.main".to_string(),
+///     mode: "managed".to_string(),
+///     r#type: "aws_vpc".to_string(),
+///     name: "main".to_string(),
+///     values: None,
+/// };
+/// 
+/// let module_meta = ModuleMeta {
+///     key: "test".to_string(),
+///     source: "./modules/test".to_string(),
+///     dir: "modules/test".to_string(),
+/// };
+/// 
+/// let resource_with_id = ResourceWithId {
+///     resource: &resource,
+///     terraform_resource,
+///     id: "vpc-12345".to_string(),
+///     module_meta: &module_meta,
+///     module_path: PathBuf::from("./modules/test"),
+/// };
+/// 
+/// let command_str = builder.build_command_string(&resource_with_id);
+/// println!("Would execute: {}", command_str);
+/// ```
     pub fn build_command_string(&self, resource: &ResourceWithId) -> String {
         let full_path = self.module_root.join(&resource.module_meta.dir);
         format!(

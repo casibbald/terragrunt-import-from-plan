@@ -40,8 +40,11 @@ use std::path::Path;
 /// ```no_run
 /// use terragrunt_import_from_plan::app::load_modules;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let modules = load_modules("path/to/modules.json")?;
 /// println!("Found {} modules", modules.modules.len());
+/// # Ok(())
+/// # }
 /// ```
 pub fn load_modules<P: AsRef<Path>>(path: P) -> Result<ModulesFile> {
     let path = path.as_ref();
@@ -75,8 +78,11 @@ pub fn load_modules<P: AsRef<Path>>(path: P) -> Result<ModulesFile> {
 /// ```no_run
 /// use terragrunt_import_from_plan::app::load_plan;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let plan = load_plan("path/to/plan.json")?;
 /// println!("Plan format version: {}", plan.format_version);
+/// # Ok(())
+/// # }
 /// ```
 pub fn load_plan<P: AsRef<Path>>(path: P) -> Result<PlanFile> {
     let path = path.as_ref();
@@ -111,9 +117,12 @@ pub fn load_plan<P: AsRef<Path>>(path: P) -> Result<PlanFile> {
 /// ```no_run
 /// use terragrunt_import_from_plan::app::load_input_files;
 /// 
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let (modules, plan) = load_input_files("modules.json", "plan.json")?;
 /// println!("Loaded {} modules and plan version {}", 
 ///          modules.modules.len(), plan.format_version);
+/// # Ok(())
+/// # }
 /// ```
 pub fn load_input_files<P1: AsRef<Path>, P2: AsRef<Path>>(
     modules_path: P1, 
