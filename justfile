@@ -102,6 +102,9 @@ test-all:
     cargo run -- plan gcp --safe
     cargo run -- plan aws --safe
     cargo run -- plan azure --safe
+    cargo run -- generate-fixtures gcp
+    cargo run -- generate-fixtures aws
+    cargo run -- generate-fixtures azure
     cargo test -- --test-threads=1
 
 
