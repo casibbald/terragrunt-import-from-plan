@@ -1,8 +1,61 @@
+//! # Provider-Specific ID Scoring Strategies Module
+//! 
+//! This module implements intelligent, provider-specific scoring strategies for identifying
+//! the best resource ID candidates. Each cloud provider has unique naming conventions and
+//! identifier patterns, so provider-specific strategies significantly improve ID inference
+//! accuracy over generic approaches.
+//! 
+//! ## Key Features
+//! 
+//! - **Provider-Specific Intelligence**: Tailored scoring for Google Cloud, Azure, AWS
+//! - **Schema-Driven Analysis**: Uses rich attribute metadata for intelligent scoring
+//! - **Automatic Provider Detection**: Detects provider from resource type names
+//! - **Extensible Architecture**: Easy to add new provider strategies
+//! - **Fallback Support**: Generic strategy for unknown providers
+//! 
+//! ## Supported Providers
+//! 
+//! - **Google Cloud Platform**: Optimized for GCP resource naming patterns
+//! - **Microsoft Azure**: Tailored for Azure resource conventions
+//! - **Generic/Default**: Universal strategy for unknown providers
+//! - **AWS**: Currently uses generic strategy (room for future enhancement)
+//! 
+//! ## Usage Patterns
+//! 
+//! 1. Auto-detect provider using `detect_provider_from_resource_type()`
+//! 2. Create appropriate strategy using `create_scoring_strategy()`
+//! 3. Use strategy to score attributes for ID candidate selection
+//! 
+//! ## Scoring Intelligence
+//! 
+//! Each strategy combines:
+//! - **Name Pattern Analysis**: Provider-specific field naming conventions
+//! - **Schema Metadata**: Required/computed fields, types, descriptions
+//! - **Resource-Specific Logic**: Tailored scoring for specific resource types
+//! - **Description Analysis**: Intelligent parsing of attribute descriptions
+
 use serde_json::Value;
 use super::traits::{IdScoringStrategy, ProviderType};
 use crate::schema::metadata::AttributeMetadata;
 
 /// Google Cloud Platform specific ID scoring strategy
+/// 
+/// This strategy implements GCP-specific intelligence for identifying the best resource
+/// ID candidates. It understands GCP naming conventions, resource patterns, and the
+/// importance of fields like `self_link` which are unique to Google Cloud.
+/// 
+/// # Key GCP-Specific Features
+/// - Prioritizes `self_link` fields (GCP's unique self-referencing URLs)
+/// - Understands resource-specific naming (e.g., `repository_id` for artifact registries)
+/// - Optimized scoring for common GCP services (Compute, Storage, BigQuery, etc.)
+/// - Intelligent handling of GCP's computed ID fields
+/// 
+/// # Scoring Priorities
+/// 1. **Exact ID fields**: `id`, `self_link` (95-100 points)
+/// 2. **Resource names**: `name`, `bucket`, `instance_id` (85-92 points)
+/// 3. **Suffix patterns**: `*_id`, `*_name` (55-80 points)
+/// 4. **Location fields**: `project`, `region`, `zone` (45-70 points)
+/// 5. **Schema metadata bonuses**: Required/computed fields get additional points
 pub struct GoogleCloudScoringStrategy;
 
 impl IdScoringStrategy for GoogleCloudScoringStrategy {
@@ -153,6 +206,23 @@ impl IdScoringStrategy for GoogleCloudScoringStrategy {
 }
 
 /// Azure specific ID scoring strategy
+/// 
+/// This strategy implements Azure-specific intelligence for identifying the best resource
+/// ID candidates. It understands Azure naming conventions, resource group patterns, and
+/// the importance of fields like `resource_id` and `fqdn` which are significant in Azure.
+/// 
+/// # Key Azure-Specific Features
+/// - Prioritizes `resource_id` fields (Azure's resource identifiers)
+/// - Understands `fqdn` importance for network and DNS resources
+/// - Optimized for Azure naming patterns (`*_name`, resource groups)
+/// - Intelligent handling of Azure location and subscription concepts
+/// 
+/// # Scoring Priorities
+/// 1. **Exact ID fields**: `id`, `resource_id` (95-100 points)
+/// 2. **Resource names**: `name`, `fqdn` (85-90 points)
+/// 3. **Suffix patterns**: `*_id`, `*_name` (75-80 points)
+/// 4. **Azure concepts**: `resource_group_name`, `location` (65-70 points)
+/// 5. **Schema metadata bonuses**: Required/computed fields get additional points
 pub struct AzureScoringStrategy;
 
 impl IdScoringStrategy for AzureScoringStrategy {
@@ -257,6 +327,23 @@ impl IdScoringStrategy for AzureScoringStrategy {
 }
 
 /// Default/generic ID scoring strategy for unknown or multi-provider scenarios
+/// 
+/// This strategy provides universal scoring logic that works across different cloud
+/// providers. It focuses on common naming patterns and universal concepts that
+/// apply regardless of the specific provider being used.
+/// 
+/// # Key Universal Features
+/// - Provider-agnostic scoring based on universal patterns
+/// - Emphasis on common field names (`id`, `name`, `*_id` patterns)
+/// - Generic handling of computed and required fields
+/// - Fallback strategy when provider-specific logic isn't available
+/// 
+/// # Scoring Priorities
+/// 1. **Universal ID fields**: `id`, `name` (85-90 points)
+/// 2. **Common patterns**: `*_id`, `*_name`, `identifier` (75-80 points)
+/// 3. **Self-referencing**: `*link*`, `*url*`, `*self*` (70 points)
+/// 4. **Location fields**: `region`, `location`, `zone` (60 points)
+/// 5. **Schema metadata bonuses**: Required/computed fields get additional points
 pub struct DefaultScoringStrategy;
 
 impl IdScoringStrategy for DefaultScoringStrategy {
@@ -353,7 +440,48 @@ impl IdScoringStrategy for DefaultScoringStrategy {
     }
 }
 
-/// Factory function to create the appropriate scoring strategy based on provider
+/// Creates an appropriate ID scoring strategy based on the provider type
+/// 
+/// This factory function returns the optimal scoring strategy for a given cloud provider.
+/// Each provider has unique naming conventions and identifier patterns, so using the
+/// correct provider-specific strategy significantly improves ID inference accuracy.
+/// 
+/// # Arguments
+/// * `provider_type` - The cloud provider type to create a strategy for
+/// 
+/// # Returns
+/// Box containing the appropriate IdScoringStrategy implementation
+/// 
+/// # Supported Providers
+/// - **GoogleCloud**: Returns GoogleCloudScoringStrategy with GCP-specific logic
+/// - **Azure**: Returns AzureScoringStrategy with Azure-specific logic
+/// - **AWS**: Currently returns DefaultScoringStrategy (room for future enhancement)
+/// - **Generic**: Returns DefaultScoringStrategy for unknown providers
+/// 
+/// # Examples
+/// ```no_run
+/// use terragrunt_import_from_plan::scoring::strategies::{create_scoring_strategy, detect_provider_from_resource_type};
+/// use terragrunt_import_from_plan::schema::metadata::AttributeMetadata;
+/// 
+/// // Auto-detect and create strategy
+/// let provider = detect_provider_from_resource_type("google_storage_bucket");
+/// let strategy = create_scoring_strategy(provider);
+/// 
+/// // Create sample metadata for testing
+/// let metadata = AttributeMetadata {
+///     required: true,
+///     computed: false,
+///     optional: false,
+///     attr_type: "string".to_string(),
+///     description: Some("Resource name".to_string()),
+///     description_kind: None,
+///     sensitive: None,
+/// };
+/// 
+/// // Use strategy to score attributes
+/// let score = strategy.score_attribute_with_metadata("name", &metadata, "google_storage_bucket");
+/// println!("Attribute 'name' scored: {}", score);
+/// ```
 pub fn create_scoring_strategy(provider_type: ProviderType) -> Box<dyn IdScoringStrategy> {
     match provider_type {
         ProviderType::GoogleCloud => Box::new(GoogleCloudScoringStrategy),
@@ -363,7 +491,45 @@ pub fn create_scoring_strategy(provider_type: ProviderType) -> Box<dyn IdScoring
     }
 }
 
-/// Auto-detect provider type from resource type string
+/// Automatically detects the cloud provider type from a terraform resource type string
+/// 
+/// This function analyzes the resource type naming convention to determine which cloud
+/// provider it belongs to. This enables automatic selection of the appropriate
+/// provider-specific scoring strategy for optimal ID inference.
+/// 
+/// # Arguments
+/// * `resource_type` - Terraform resource type string (e.g., "google_storage_bucket")
+/// 
+/// # Returns
+/// ProviderType enum indicating the detected cloud provider
+/// 
+/// # Detection Logic
+/// - **GoogleCloud**: Resource types starting with "google_" or "gcp_"
+/// - **Azure**: Resource types starting with "azurerm_" or "azure_"
+/// - **AWS**: Resource types starting with "aws_"
+/// - **Generic**: Any other resource type patterns
+/// 
+/// # Examples
+/// ```
+/// use terragrunt_import_from_plan::scoring::strategies::detect_provider_from_resource_type;
+/// use terragrunt_import_from_plan::scoring::traits::ProviderType;
+/// 
+/// assert_eq!(detect_provider_from_resource_type("google_storage_bucket"), ProviderType::GoogleCloud);
+/// assert_eq!(detect_provider_from_resource_type("azurerm_virtual_machine"), ProviderType::Azure);
+/// assert_eq!(detect_provider_from_resource_type("aws_s3_bucket"), ProviderType::AWS);
+/// assert_eq!(detect_provider_from_resource_type("custom_resource"), ProviderType::Generic);
+/// ```
+/// 
+/// # Usage Pattern
+/// ```no_run
+/// use terragrunt_import_from_plan::scoring::strategies::{detect_provider_from_resource_type, create_scoring_strategy};
+/// 
+/// // Automatic provider detection and strategy creation
+/// let provider = detect_provider_from_resource_type("google_compute_instance");
+/// let strategy = create_scoring_strategy(provider);
+/// 
+/// // Now use the provider-optimized strategy for scoring
+/// ```
 pub fn detect_provider_from_resource_type(resource_type: &str) -> ProviderType {
     if resource_type.starts_with("google_") || resource_type.starts_with("gcp_") {
         ProviderType::GoogleCloud
