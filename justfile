@@ -14,47 +14,33 @@ run cloud=default_cloud:
     cargo run -- --plan tests/fixtures/{{cloud}}/out.json --modules tests/fixtures/{{cloud}}/modules.json --module-root simulator/{{cloud}}/modules --dry-run
 
 gen cloud=default_cloud:
-    just clean {{cloud}}
-    just init {{cloud}}
-    just plan {{cloud}}
-    just plans-to-json {{cloud}}
-    just copy-plan-json {{cloud}}
+    cargo run -- generate-fixtures {{cloud}}
 
 
 # Initialize all modules
 init cloud=default_cloud env=default_env:
-    just clean {{cloud}}
-    cd envs/simulator/{{cloud}}/{{env}} && terragrunt init --all
+    cargo run -- init {{cloud}} --env {{env}}
 
 # Plan all modules
-# Do not give a .tf to the binary output, it will not work with Terragrunt
 plan cloud=default_cloud env=default_env *VARS="":
-    cd envs/simulator/{{cloud}}/{{env}} && AWS_EC2_METADATA_DISABLED=true {{VARS}} terragrunt run-all plan -out out.tfplan
+    cargo run -- plan {{cloud}} --env {{env}} --vars "{{VARS}}"
 
 
-# Convert all .tfplan files to plan.json in-place under .terragrunt-cache
+# Convert all .tfplan files to plan.json in-place under .terragrunt-cache (replaced by generate-fixtures)
 plans-to-json cloud=default_cloud env=default_env *VARS="":
-    cd envs/simulator/{{cloud}}/{{env}} && \
-    find .terragrunt-cache -type f -name '*.tfplan' | while read plan; do \
-      echo "Converting $plan to JSON..."; \
-      terraform -chdir="$(dirname "$plan")" show -json "$(basename "$plan")" | jq '.' > "test/tmp/$(basename "$plan" .tfplan).json"; \
-    done
+    cargo run -- generate-fixtures {{cloud}}
 
 copy-plan-json cloud=default_cloud env=default_env *VARS="":
-    cd envs/simulator/{{cloud}}/{{env}} && \
-    find ./.terragrunt-cache -name "*.json" -type f -exec ls {} \; | while read plan; do \
-      echo "Copying $plan to test/tmp..."; \
-      cp "$plan" "../../../tests/fixtures/$(basename "$plan")"; \
-    done
+    cargo run -- generate-fixtures {{cloud}}
 
 
 # Apply all modules
 apply cloud=default_cloud env=default_env:
-    cd envs/simulator/{{cloud}}/{{env}} && terragrunt run-all apply
+    cargo run -- apply {{cloud}} --env {{env}}
 
 # Destroy all infrastructure
 destroy cloud=default_cloud env=default_env:
-    cd envs/simulator/{{cloud}}/{{env}} && terragrunt run-all destroy
+    cargo run -- destroy {{cloud}} --env {{env}}
 
 # Module-specific commands
 plan-module module cloud=default_cloud env=default_env:
@@ -63,97 +49,90 @@ plan-module module cloud=default_cloud env=default_env:
 apply-module module cloud=default_cloud env=default_env:
     cd envs/simulator/{{cloud}}/{{env}}/{{module}} && terragrunt apply
 
-# Comprehensive Terraform validation for all cloud providers
+# Comprehensive Terraform validation for all cloud providers  
 validate cloud=default_cloud:
-    echo "🔍 Running comprehensive validation for {{cloud}}..."
-    just validate-format {{cloud}}
-    just validate-terraform {{cloud}}
+    cargo run -- validate {{cloud}}
 
-# Format validation
-validate-format cloud=default_cloud:
-    echo "📝 Checking Terraform formatting for {{cloud}}..."
-    terraform fmt -check -recursive simulator/{{cloud}}/
-
-# Terraform validate for specific cloud provider (no credentials needed)
-validate-terraform cloud=default_cloud:
-    echo "✅ Running terraform validate for {{cloud}}..."
-    cd simulator/{{cloud}} && AWS_EC2_METADATA_DISABLED=true terraform init -backend=false
-    cd simulator/{{cloud}} && AWS_EC2_METADATA_DISABLED=true terraform validate
-
-# Run all validations for all cloud providers
+# Run all validations for all cloud providers for all cloud providers (AWS, GCP, Azure)
 validate-all:
-    echo "🌐 Running validation for all cloud providers..."
-    just validate aws
-    just validate gcp  
-    just validate azure
+    cargo run -- validate aws
+    cargo run -- validate gcp  
+    cargo run -- validate azure
 
 # Fix formatting issues
 fmt cloud=default_cloud:
-    echo "🔧 Fixing Terraform formatting for {{cloud}}..."
-    terraform fmt -recursive simulator/{{cloud}}/
+    cargo run -- fmt {{cloud}}
 
-# Fix formatting for all cloud providers  
+# Fix formatting for all cloud providers for all cloud providers (AWS, GCP, Azure)
 fmt-all:
-    echo "🔧 Fixing formatting for all cloud providers..."
-    just fmt aws
-    just fmt gcp
-    just fmt azure
+    cargo run -- fmt aws
+    cargo run -- fmt gcp
+    cargo run -- fmt azure
 
-# CI-friendly validation (no API calls, no credentials needed)
+# CI-friendly validation (no API calls, no credentials needed) for all cloud providers (AWS, GCP, Azure)
 validate-ci:
-    echo "🚀 Running CI-friendly validation..."
-    AWS_EC2_METADATA_DISABLED=true just validate-all
+    cargo run -- validate aws
+    cargo run -- validate gcp  
+    cargo run -- validate azure
 
 # Clean Terraform cache and state files (use with caution)
 clean cloud=default_cloud:
-    find . -name ".terraform" -type d -exec rm -rf {} +
-    find . -name ".terragrunt-cache" -type d -exec rm -rf {} +
-    find . -name "*.tfstate" -type f -exec rm -f {} +
-    find . -name ".*.lock.hcl" -type f -exec rm -f {} +
-    find . -name "out.tfplan" -type f -exec rm -f {} +
-    find envs/simulator/{{cloud}}/dev -name "plan.json" -type f -exec rm -f {} +
-    find envs/simulator/{{cloud}}/dev -name ".terragrunt-provider-schema.json" -type f -exec rm -f {} +
+    cargo run -- clean {{cloud}}
 
 test:
     cargo test -- --test-threads=1
 
 # Plan with error handling for testing (continues on failure)
 plan-safe cloud=default_cloud env=default_env *VARS="":
-    -cd envs/simulator/{{cloud}}/{{env}} && AWS_EC2_METADATA_DISABLED=true {{VARS}} terragrunt run-all plan -out out.tfplan
+    cargo run -- plan {{cloud}} --env {{env}} --vars "{{VARS}}" --safe
 
 # Initialize with error handling for testing (continues on failure)  
 init-safe cloud=default_cloud env=default_env:
-    -just clean {{cloud}}
-    -cd envs/simulator/{{cloud}}/{{env}} && terragrunt init --all
+    cargo run -- init {{cloud}} --env {{env}} --safe
 
-# Run tests with fresh provider schemas for both AWS and GCP
+# Run tests with fresh provider schemas for all cloud providers (AWS, GCP, Azure)
 test-with-fresh-schemas:
-    just clean-all
-    AWS_EC2_METADATA_DISABLED=true just init-safe gcp
-    AWS_EC2_METADATA_DISABLED=true just init-safe aws
-    AWS_EC2_METADATA_DISABLED=true just plan-safe gcp
-    AWS_EC2_METADATA_DISABLED=true just plan-safe aws
+    cargo run -- clean gcp
+    cargo run -- clean aws
+    cargo run -- clean azure
+    cargo run -- init gcp --safe
+    cargo run -- init aws --safe
+    cargo run -- init azure --safe
+    cargo run -- plan gcp --safe
+    cargo run -- plan aws --safe
+    cargo run -- plan azure --safe
     cargo test -- --test-threads=1
 
 # Multi-cloud convenience commands
 run-gcp:
-    just run gcp
+    cargo run -- --plan tests/fixtures/gcp/out.json --modules tests/fixtures/gcp/modules.json --module-root simulator/gcp/modules --dry-run
 
 run-aws:
-    just run aws
+    cargo run -- --plan tests/fixtures/aws/out.json --modules tests/fixtures/aws/modules.json --module-root simulator/aws/modules --dry-run
+
+run-azure:
+    cargo run -- --plan tests/fixtures/azure/out.json --modules tests/fixtures/azure/modules.json --module-root simulator/azure/modules --dry-run
 
 gen-gcp:
-    just gen gcp
+    cargo run -- generate-fixtures gcp
 
 gen-aws:
-    just gen aws
+    cargo run -- generate-fixtures aws
+
+gen-azure:
+    cargo run -- generate-fixtures azure
 
 init-gcp:
-    just init gcp
+    cargo run -- init gcp
 
 init-aws:
-    just init aws
+    cargo run -- init aws
 
+init-azure:
+    cargo run -- init azure
+
+# for all cloud providers (AWS, GCP, Azure)
 clean-all:
-    just clean gcp
-    just clean aws
+    cargo run -- clean gcp
+    cargo run -- clean aws
+    cargo run -- clean azure

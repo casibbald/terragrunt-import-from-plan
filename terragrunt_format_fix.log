@@ -1,0 +1,24 @@
+echo "🔧 Fixing formatting for all cloud providers..."
+🔧 Fixing formatting for all cloud providers...
+just fmt aws
+echo "🔧 Fixing Terraform formatting for aws..."
+🔧 Fixing Terraform formatting for aws...
+terraform fmt -recursive simulator/aws/
+simulator/aws/modules/ecr/main.tf
+simulator/aws/modules/kms/main.tf
+simulator/aws/modules/s3/main.tf
+simulator/aws/modules/sns/main.tf
+simulator/aws/variables.tf
+just fmt gcp
+echo "🔧 Fixing Terraform formatting for gcp..."
+🔧 Fixing Terraform formatting for gcp...
+terraform fmt -recursive simulator/gcp/
+just fmt azure
+echo "🔧 Fixing Terraform formatting for azure..."
+🔧 Fixing Terraform formatting for azure...
+terraform fmt -recursive simulator/azure/
+simulator/azure/modules/aks/main.tf
+simulator/azure/modules/cosmos_db/main.tf
+simulator/azure/modules/functions/main.tf
+simulator/azure/modules/sql/main.tf
+simulator/azure/modules/storage/main.tf

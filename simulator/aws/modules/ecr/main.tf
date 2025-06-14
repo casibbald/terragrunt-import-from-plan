@@ -65,5 +65,5 @@ resource "aws_ecr_lifecycle_policy" "example" {
 
 # Mock account ID for CI/CD compatibility (no API calls needed)
 locals {
-  account_id = "123456789012"  # Static mock value for simulation
+  account_id = "123456789012" # Static mock value for simulation
 } 

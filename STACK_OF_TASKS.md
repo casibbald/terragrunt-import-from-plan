@@ -291,6 +291,205 @@ pub fn infer_resource_id(
 - **Azure-specific optimizations** - Azure naming pattern recognition
 - **Generic provider framework** - Easy addition of new cloud providers
 
+### **Phase 5: Eliminate Shell Dependencies** 🔄 **HIGH PRIORITY**
+
+> 🎯 **GOAL**: Replace justfile shell commands with Rust subcommands to eliminate `just` dependency from GitHub Actions and make the tool self-contained.
+
+#### **🛠️ Rust Subcommand Implementation** ⏱️ ~2-3 weeks
+
+**Current State Analysis:**
+- ✅ **Already Implemented**: `clean [provider]`, `generate-fixtures <provider>`, `extract-id-fields <schema-file>`
+- 📋 **Need Implementation**: Core terragrunt operations, validation, plan processing, module operations
+
+**Implementation Priority:**
+
+**Priority 1: CI/CD Critical Commands** ⏱️ ~1 week
+- [ ] `validate <provider>` - Replace `just validate-format` + `just validate-terraform`
+  ```bash
+  # Current justfile:
+  terraform fmt -check -recursive simulator/{{cloud}}/
+  cd simulator/{{cloud}} && terraform init -backend=false && terraform validate
+  
+  # New Rust subcommand:
+  cargo run -- validate aws --format-check --terraform-check
+  ```
+- [ ] `fmt <provider>` - Replace `just fmt` with optional `--check` flag
+  ```bash
+  # Current justfile: 
+  terraform fmt -recursive simulator/{{cloud}}/
+  
+  # New Rust subcommand:
+  cargo run -- fmt aws [--check]
+  ```
+
+**Priority 2: Core Terragrunt Operations** ⏱️ ~1 week
+- [ ] `init <provider>` - Replace `just init` and `just init-safe`
+  ```bash
+  # Current justfile:
+  just clean {{cloud}} && cd envs/simulator/{{cloud}}/{{env}} && terragrunt init --all
+  
+  # New Rust subcommand:
+  cargo run -- init aws [--env dev] [--safe]
+  ```
+- [ ] `plan <provider>` - Replace `just plan` and `just plan-safe`
+  ```bash
+  # Current justfile:
+  cd envs/simulator/{{cloud}}/{{env}} && terragrunt run-all plan -out out.tfplan
+  
+  # New Rust subcommand:
+  cargo run -- plan aws [--env dev] [--vars "KEY=value"] [--safe]
+  ```
+- [ ] `apply <provider>` - Replace `just apply`
+  ```bash
+  # Current justfile:
+  cd envs/simulator/{{cloud}}/{{env}} && terragrunt run-all apply
+  
+  # New Rust subcommand:
+  cargo run -- apply aws [--env dev]
+  ```
+- [ ] `destroy <provider>` - Replace `just destroy`
+  ```bash
+  # Current justfile:
+  cd envs/simulator/{{cloud}}/{{env}} && terragrunt run-all destroy
+  
+  # New Rust subcommand:
+  cargo run -- destroy aws [--env dev]
+  ```
+
+**Priority 3: Plan Processing Pipeline** ⏱️ ~3-4 days
+- [ ] `convert-plans <provider>` - Replace `just plans-to-json`
+  ```bash
+  # Current justfile: Complex shell pipeline with find/while/terraform show
+  find .terragrunt-cache -name '*.tfplan' | while read plan; do
+    terraform show -json "$plan" > "output.json"
+  done
+  
+  # New Rust subcommand:
+  cargo run -- convert-plans aws [--env dev]
+  ```
+- [ ] `copy-fixtures <provider>` - Replace `just copy-plan-json`
+  ```bash
+  # Current justfile: Complex shell pipeline with find/cp
+  find .terragrunt-cache -name "*.json" -exec cp {} fixtures/ \;
+  
+  # New Rust subcommand:
+  cargo run -- copy-fixtures aws [--env dev]
+  ```
+
+**Priority 4: Module-Level Operations** ⏱️ ~2-3 days
+- [ ] `plan-module <provider> <module>` - Replace `just plan-module`
+  ```bash
+  # Current justfile:
+  cd envs/simulator/{{cloud}}/{{env}}/{{module}} && terragrunt plan
+  
+  # New Rust subcommand:
+  cargo run -- plan-module aws vpc [--env dev]
+  ```
+- [ ] `apply-module <provider> <module>` - Replace `just apply-module`
+  ```bash
+  # Current justfile:
+  cd envs/simulator/{{cloud}}/{{env}}/{{module}} && terragrunt apply
+  
+  # New Rust subcommand:
+  cargo run -- apply-module aws vpc [--env dev]
+  ```
+
+**Excluded: No "ALL" Variants**
+Following user preference to call commands multiple times per provider rather than composite commands:
+- ❌ `validate-all` - Use `validate aws && validate gcp && validate azure`
+- ❌ `fmt-all` - Use `fmt aws && fmt gcp && fmt azure`  
+- ❌ `clean-all` - Use `clean aws && clean gcp && clean azure`
+
+**Implementation Architecture:**
+
+```rust
+#[derive(Subcommand, Debug)]
+enum Commands {
+    // ✅ Already implemented
+    GenerateFixtures { provider: String },
+    Clean { provider: Option<String> },
+    ExtractIdFields { schema_file: String },
+    
+    // 📋 New implementations needed
+    Validate { 
+        provider: String, 
+        #[arg(long)] format_check: bool,
+        #[arg(long)] terraform_check: bool,
+    },
+    Fmt { 
+        provider: String, 
+        #[arg(long)] check: bool 
+    },
+    Init { 
+        provider: String, 
+        #[arg(long)] env: Option<String>,
+        #[arg(long)] safe: bool,
+    },
+    Plan { 
+        provider: String, 
+        #[arg(long)] env: Option<String>,
+        #[arg(long)] vars: Option<String>,
+        #[arg(long)] safe: bool,
+    },
+    Apply { 
+        provider: String, 
+        #[arg(long)] env: Option<String> 
+    },
+    Destroy { 
+        provider: String, 
+        #[arg(long)] env: Option<String> 
+    },
+    ConvertPlans { 
+        provider: String, 
+        #[arg(long)] env: Option<String> 
+    },
+    CopyFixtures { 
+        provider: String, 
+        #[arg(long)] env: Option<String> 
+    },
+    PlanModule { 
+        provider: String, 
+        module: String,
+        #[arg(long)] env: Option<String> 
+    },
+    ApplyModule { 
+        provider: String, 
+        module: String,
+        #[arg(long)] env: Option<String> 
+    },
+}
+```
+
+**Benefits After Implementation:**
+- ✅ **No `just` dependency** - GitHub Actions can call `cargo run --` directly
+- ✅ **Self-contained tool** - All logic centralized in Rust
+- ✅ **Better error handling** - Rust error context vs. shell exit codes
+- ✅ **Consistent interface** - Same CLI patterns across all commands
+- ✅ **Enhanced logging** - Structured logging with proper verbosity levels
+- ✅ **Cross-platform** - No shell-specific dependencies
+
+**Expected Justfile After Migration:**
+```bash
+# Simplified justfile - only cargo runners
+default:
+    @just --list
+
+run cloud=default_cloud:
+    cargo run -- --plan tests/fixtures/{{cloud}}/out.json --modules tests/fixtures/{{cloud}}/modules.json --module-root simulator/{{cloud}}/modules --dry-run
+
+# All other commands become simple cargo run calls:
+init cloud=default_cloud:
+    cargo run -- init {{cloud}}
+
+validate cloud=default_cloud:
+    cargo run -- validate {{cloud}}
+
+fmt cloud=default_cloud:
+    cargo run -- fmt {{cloud}}
+
+# etc...
+```
+
 ---
 
 ## ⚠️ **Critical Architecture Constraints**

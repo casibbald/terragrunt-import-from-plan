@@ -100,12 +100,3 @@ jobs:
 
       - name: Dry run test - AWS modules
         run: cargo run -- --plan tests/fixtures/aws/out.json --modules tests/fixtures/aws/modules.json --module-root simulator/aws/modules --dry-run --working-directory envs/simulator/aws/dev
-#
-#      - name: Run just plan
-#        run: just plan
-#
-#      - name: Run entrypoint test
-#        run: |
-#          chmod +x entrypoint.sh
-#          ./test/entrypoint_test.sh
-
