@@ -217,7 +217,6 @@ pub struct ModulesFile {
 /// 
 /// # Returns
 /// A vector of error messages for any missing or invalid directories
-#[allow(dead_code)]
 pub fn validate_module_dirs<P: AsRef<Path>>(
     modules: &[ModuleMeta],
     module_root: P,
@@ -299,7 +298,6 @@ pub fn map_resources_to_modules<'a>(
 /// 
 /// # Returns
 /// Vector of terragrunt import command strings
-#[allow(dead_code)]
 pub fn generate_import_commands(
     resource_map: &HashMap<String, &ModuleMeta>,
     plan: &PlanFile,
@@ -369,7 +367,6 @@ pub fn generate_import_commands(
 /// 
 /// # Returns
 /// Set of attribute names that could potentially be used as resource IDs
-#[allow(dead_code)]
 pub fn extract_id_candidate_fields_from_values(values: &Map<String, Value>) -> HashSet<String> {
     let mut fields = HashSet::new();
 
