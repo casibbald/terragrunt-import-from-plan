@@ -6,6 +6,8 @@
 ### 🤔 Why Use This Action?
 
 
+
+
 When running `terragrunt plan`, you may have resources marked for creation but not yet in the Terraform state. This action
 helps you automatically import those resources using **intelligent, schema-driven analysis** to ensure your state file is up-to-date without manual intervention.
 
