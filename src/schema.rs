@@ -57,7 +57,7 @@ pub enum SchemaError {
 
 /// Generates and writes terraform provider schema to a JSON file
 /// 
-/// This function executes `terragrunt providers schema -json` in the specified directory
+/// This function executes `terragrunt run -- providers schema -json` in the specified directory
 /// and writes the resulting provider schema to `.terragrunt-provider-schema.json`.
 /// The schema contains detailed information about all resource types and their attributes
 /// supported by the terraform providers in use.

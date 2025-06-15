@@ -94,6 +94,9 @@ enum Commands {
         /// Specific provider to clean (optional, cleans all if not specified)
         #[arg(value_parser = ["aws", "gcp", "azure"])]
         provider: Option<String>,
+        /// Also remove test fixtures (deep clean)
+        #[arg(long)]
+        deep: bool,
     },
     /// Extract ID candidate fields from schema
     ExtractIdFields {
@@ -235,9 +238,9 @@ fn main() -> Result<()> {
             println!("🔧 Generating fixtures for {} provider...", provider);
             generate_fixtures(&provider)
         }
-        Some(Commands::Clean { provider }) => {
+        Some(Commands::Clean { provider, deep }) => {
             println!("🧹 Cleaning workspace...");
-            clean_workspace(provider.as_deref())
+            clean_workspace(provider.as_deref(), deep)
         }
         Some(Commands::ExtractIdFields { schema_file }) => {
             let schema_content = std::fs::read_to_string(&schema_file)
@@ -290,7 +293,7 @@ fn main() -> Result<()> {
             setup_provider_schema(args.working_directory.as_deref())?;
             
             let mapping = map_resources_to_modules(&modules_file.modules, &plan_file);
-            execute_or_print_imports(&mapping, &plan_file, args.dry_run, args.verbose, &module_root);
+            execute_or_print_imports(&mapping, &plan_file, args.dry_run, args.verbose, &module_root, args.working_directory.as_deref());
             
             Ok(())
         }

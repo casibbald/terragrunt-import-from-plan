@@ -244,6 +244,7 @@ pub fn score_attributes_for_id(_resource_type: &str, attributes: &HashMap<String
     
     // Score each attribute
     for (name, def) in attributes {
+        #[allow(unused_assignments)]
         let mut score = 0.0;
         
         // Explicit ID field gets highest score

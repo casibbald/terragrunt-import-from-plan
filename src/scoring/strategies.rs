@@ -88,10 +88,10 @@ impl IdScoringStrategy for GoogleCloudScoringStrategy {
             },
             
             // Required fields might be identifying
-            name if definition.get("required").and_then(|v| v.as_bool()).unwrap_or(false) => 55.0,
+            _name if definition.get("required").and_then(|v| v.as_bool()).unwrap_or(false) => 55.0,
             
             // String types are generally better for IDs
-            name if definition.get("type").and_then(|v| v.as_str()) == Some("string") => 40.0,
+            _name if definition.get("type").and_then(|v| v.as_str()) == Some("string") => 40.0,
             
             // Default score for other attributes
             _ => 30.0,
@@ -245,9 +245,9 @@ impl IdScoringStrategy for AzureScoringStrategy {
             "subscription_id" => 60.0,
             
             // Lower priority - computed fields
-            name if definition.get("computed").and_then(|v| v.as_bool()).unwrap_or(false) => 45.0,
-            name if definition.get("required").and_then(|v| v.as_bool()).unwrap_or(false) => 55.0,
-            name if definition.get("type").and_then(|v| v.as_str()) == Some("string") => 40.0,
+            _name if definition.get("computed").and_then(|v| v.as_bool()).unwrap_or(false) => 45.0,
+            _name if definition.get("required").and_then(|v| v.as_bool()).unwrap_or(false) => 55.0,
+            _name if definition.get("type").and_then(|v| v.as_str()) == Some("string") => 40.0,
             
             _ => 30.0,
         }
@@ -366,13 +366,13 @@ impl IdScoringStrategy for DefaultScoringStrategy {
             name if name.contains("region") || name.contains("location") || name.contains("zone") => 60.0,
             
             // Computed fields - might be generated IDs
-            name if definition.get("computed").and_then(|v| v.as_bool()).unwrap_or(false) => 50.0,
+            _name if definition.get("computed").and_then(|v| v.as_bool()).unwrap_or(false) => 50.0,
             
             // Required fields - might be essential identifiers
-            name if definition.get("required").and_then(|v| v.as_bool()).unwrap_or(false) => 55.0,
+            _name if definition.get("required").and_then(|v| v.as_bool()).unwrap_or(false) => 55.0,
             
             // String types - better for human-readable IDs
-            name if definition.get("type").and_then(|v| v.as_str()) == Some("string") => 40.0,
+            _name if definition.get("type").and_then(|v| v.as_str()) == Some("string") => 40.0,
             
             _ => 30.0,
         }
