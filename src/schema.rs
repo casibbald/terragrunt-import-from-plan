@@ -90,8 +90,6 @@ pub enum SchemaError {
 /// ```
 pub fn write_provider_schema(dir: &Path) -> Result<(), SchemaError> {
     let output = Command::new("terragrunt")
-        .arg("run")
-        .arg("--")
         .arg("providers")
         .arg("schema")
         .arg("-json")

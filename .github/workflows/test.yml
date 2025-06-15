@@ -39,17 +39,16 @@ jobs:
 
       - name: Setup Terraform and Terragrunt
         run: |
-          # Install compatible Terraform and Terragrunt versions
-          # Using Terraform 1.9.8 with Terragrunt 0.74.0 for better compatibility
-          echo "Installing Terraform 1.9.8..."
-          wget -q -O terraform.zip https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
+          # Install Terraform and Terragrunt versions that work locally
+          echo "Installing Terraform 1.12.2..."
+          wget -q -O terraform.zip https://releases.hashicorp.com/terraform/1.12.2/terraform_1.12.2_linux_amd64.zip
           unzip terraform.zip
           chmod +x terraform
           sudo mv terraform /usr/local/bin/
           terraform version
           
-          echo "Installing Terragrunt 0.74.0..."
-          wget -q -O terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v0.74.0/terragrunt_linux_amd64
+          echo "Installing Terragrunt 0.81.0..."
+          wget -q -O terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v0.81.0/terragrunt_linux_amd64
           chmod +x terragrunt
           sudo mv terragrunt /usr/local/bin/
           terragrunt --version
