@@ -9,6 +9,8 @@ name: Multi-Provider Import Testing
 
 on:
   workflow_dispatch:
+  public:
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
