@@ -86,9 +86,8 @@ jobs:
           REGION: "us-central1"
           # Suppress warnings for cleaner CI output
           RUSTFLAGS: "-A unused -A dead_code"
-          # # Suppress Terraform version check warnings that break Terragrunt parsing
-          # TF_IN_AUTOMATION: "true"
-          # CHECKPOINT_DISABLE: "true"
+
+
 
       - name: Verify provider schemas and fixtures were generated
         run: |
@@ -135,6 +134,7 @@ jobs:
         env:
           RUSTFLAGS: "-A unused -A dead_code"
 
+
       - name: Verify fixture generation and run dry-run tests
         run: |
           echo "🔍 Verifying fixture files were generated..."
@@ -154,5 +154,4 @@ jobs:
           done
         env:
           RUSTFLAGS: "-A unused -A dead_code"
-          # TF_IN_AUTOMATION: "true"
-          # CHECKPOINT_DISABLE: "true"
+
