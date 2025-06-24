@@ -18,9 +18,9 @@
 //! Some functions support "safe mode" which continues execution despite failures.
 
 use crate::importer::{PlannedModule, Resource};
+use anyhow::{Context, Result};
 use serde_json::Value;
 use std::collections::HashSet;
-use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -122,42 +122,6 @@ pub fn collect_resources<'a>(module: &'a PlannedModule, resources: &mut Vec<&'a 
     }
 }
 
-/// Extracts potential ID candidate field names from provider schema JSON
-/// 
-/// Analyzes provider schema information to identify attribute names that could
-/// potentially be used as resource identifiers. This provides a fallback when
-/// more sophisticated schema analysis isn't available.
-/// 
-/// # Arguments
-/// * `schema_json` - JSON containing provider schema information
-/// 
-/// # Returns
-/// Set of attribute names that appear in resource schemas
-/// 
-/// # Examples
-/// ```no_run
-/// use terragrunt_import_from_plan::utils::extract_id_candidate_fields;
-/// use serde_json::json;
-/// 
-/// let schema_json = json!({
-///     "provider_schemas": {
-///         "registry.terraform.io/hashicorp/aws": {
-///             "resource_schemas": {
-///                 "aws_instance": {
-///                     "block": {
-///                         "attributes": {
-///                             "id": {},
-///                             "name": {}
-///                         }
-///                     }
-///                 }
-///             }
-///         }
-///     }
-/// });
-/// let candidates = extract_id_candidate_fields(&schema_json);
-/// println!("Found {} potential ID fields", candidates.len());
-/// ```
 pub fn extract_id_candidate_fields(schema_json: &Value) -> HashSet<String> {
     let mut candidates = HashSet::new();
 
@@ -173,7 +137,9 @@ pub fn extract_id_candidate_fields(schema_json: &Value) -> HashSet<String> {
             {
                 for (_resource_type, schema) in resource_schemas {
                     if let Some(block) = schema.get("block") {
-                        if let Some(attributes) = block.get("attributes").and_then(|a| a.as_object()) {
+                        if let Some(attributes) =
+                            block.get("attributes").and_then(|a| a.as_object())
+                        {
                             for (attr_name, _) in attributes {
                                 candidates.insert(attr_name.clone());
                             }
@@ -219,7 +185,12 @@ pub fn run_terragrunt_init(working_directory: &str) -> Result<()> {
         .arg("init")
         .current_dir(working_directory)
         .output()
-        .with_context(|| format!("Failed to execute terragrunt init in directory: {}", working_directory))?;
+        .with_context(|| {
+            format!(
+                "Failed to execute terragrunt init in directory: {}",
+                working_directory
+            )
+        })?;
 
     if output.status.success() {
         Ok(())
@@ -371,7 +342,10 @@ fn create_minimal_plan_json(provider: &str) -> Result<()> {
     let fixtures_dir = format!("tests/fixtures/{}", provider);
     fs::create_dir_all(&fixtures_dir)?;
     fs::write(format!("{}/out.json", fixtures_dir), minimal_plan)?;
-    println!("⚠️ Created minimal out.json for {} provider (plan failed)", provider);
+    println!(
+        "⚠️ Created minimal out.json for {} provider (plan failed)",
+        provider
+    );
     Ok(())
 }
 
@@ -410,7 +384,7 @@ fn create_minimal_plan_json(provider: &str) -> Result<()> {
 /// ```
 pub fn generate_fixtures(provider: &str) -> Result<()> {
     println!("🔧 Generating fixtures for {} provider...", provider);
-    
+
     // Clean workspace for this provider
     clean_workspace(Some(provider))?;
 
@@ -430,7 +404,10 @@ pub fn generate_fixtures(provider: &str) -> Result<()> {
 
     if !init_output.status.success() {
         let stderr = String::from_utf8_lossy(&init_output.stderr);
-        eprintln!("⚠️ Warning: terragrunt init failed for {}: {}", provider, stderr);
+        eprintln!(
+            "⚠️ Warning: terragrunt init failed for {}: {}",
+            provider, stderr
+        );
         // Continue despite init failure (expected in CI)
     }
 
@@ -448,17 +425,23 @@ pub fn generate_fixtures(provider: &str) -> Result<()> {
     // Always generate fixture files, even if plan fails
     let cache_path = format!("{}/.terragrunt-cache", env_path);
     generate_modules_json(provider, &cache_path)?;
-    
+
     if !plan_output.status.success() {
         let stderr = String::from_utf8_lossy(&plan_output.stderr);
-        eprintln!("⚠️ Warning: terragrunt plan failed for {}: {}", provider, stderr);
+        eprintln!(
+            "⚠️ Warning: terragrunt plan failed for {}: {}",
+            provider, stderr
+        );
         // Create minimal plan file since plan failed
         create_minimal_plan_json(provider)?;
     } else {
         generate_plan_json(provider, &cache_path)?;
     }
 
-    println!("✅ Fixtures generated successfully for {} provider", provider);
+    println!(
+        "✅ Fixtures generated successfully for {} provider",
+        provider
+    );
     Ok(())
 }
 
@@ -502,7 +485,7 @@ fn generate_modules_json(provider: &str, cache_path: &str) -> Result<()> {
     let fixtures_dir = format!("tests/fixtures/{}", provider);
     fs::create_dir_all(&fixtures_dir)?;
     fs::write(format!("{}/modules.json", fixtures_dir), modules_json)?;
-    
+
     Ok(())
 }
 
@@ -535,7 +518,7 @@ fn generate_plan_json(provider: &str, cache_path: &str) -> Result<()> {
                                 .arg(sub_path.to_str().unwrap())
                                 .current_dir(&path)
                                 .output();
-                            
+
                             if let Ok(output) = output {
                                 if output.status.success() {
                                     let fixtures_dir = format!("tests/fixtures/{}", provider);
@@ -551,14 +534,17 @@ fn generate_plan_json(provider: &str, cache_path: &str) -> Result<()> {
             }
         }
     }
-    
+
     // If no plan file found or conversion failed, create a minimal out.json
     let minimal_plan = r#"{"format_version":"1.2","terraform_version":"1.9.8","planned_values":{"root_module":{"child_modules":[]}}}"#;
     let fixtures_dir = format!("tests/fixtures/{}", provider);
     fs::create_dir_all(&fixtures_dir)?;
     fs::write(format!("{}/out.json", fixtures_dir), minimal_plan)?;
-    println!("⚠️ Created minimal out.json for {} provider (plan conversion failed)", provider);
-    
+    println!(
+        "⚠️ Created minimal out.json for {} provider (plan conversion failed)",
+        provider
+    );
+
     Ok(())
 }
 
@@ -589,7 +575,7 @@ fn generate_plan_json(provider: &str, cache_path: &str) -> Result<()> {
 /// ```
 pub fn validate_terraform_format(provider: &str) -> Result<()> {
     println!("📝 Checking Terraform formatting for {}...", provider);
-    
+
     let simulator_path = format!("simulator/{}", provider);
     if !Path::new(&simulator_path).exists() {
         anyhow::bail!("Provider directory does not exist: {}", simulator_path);
@@ -645,7 +631,7 @@ pub fn validate_terraform_format(provider: &str) -> Result<()> {
 /// ```
 pub fn validate_terraform_config(provider: &str) -> Result<()> {
     println!("✅ Running terraform validate for {}...", provider);
-    
+
     let simulator_path = format!("simulator/{}", provider);
     if !Path::new(&simulator_path).exists() {
         anyhow::bail!("Provider directory does not exist: {}", simulator_path);
@@ -722,7 +708,7 @@ pub fn validate_terraform_config(provider: &str) -> Result<()> {
 pub fn format_terraform_files(provider: &str, check_only: bool) -> Result<()> {
     let action = if check_only { "Checking" } else { "Fixing" };
     println!("🔧 {} Terraform formatting for {}...", action, provider);
-    
+
     let simulator_path = format!("simulator/{}", provider);
     if !Path::new(&simulator_path).exists() {
         anyhow::bail!("Provider directory does not exist: {}", simulator_path);
@@ -730,14 +716,15 @@ pub fn format_terraform_files(provider: &str, check_only: bool) -> Result<()> {
 
     let mut cmd = Command::new("terraform");
     cmd.arg("fmt");
-    
+
     if check_only {
         cmd.arg("-check");
     }
-    
+
     cmd.arg("-recursive").arg(&simulator_path);
 
-    let output = cmd.output()
+    let output = cmd
+        .output()
         .with_context(|| format!("Failed to run terraform fmt for {}", provider))?;
 
     if output.status.success() {
@@ -755,7 +742,7 @@ pub fn format_terraform_files(provider: &str, check_only: bool) -> Result<()> {
     } else {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        
+
         if check_only {
             anyhow::bail!(
                 "Terraform formatting check failed for {}\nFiles need formatting:\n{}\n{}",
@@ -802,8 +789,11 @@ pub fn format_terraform_files(provider: &str, check_only: bool) -> Result<()> {
 /// # }
 /// ```
 pub fn init_terragrunt(provider: &str, env: &str, safe_mode: bool) -> Result<()> {
-    println!("🚀 Initializing terragrunt for {} (env: {})...", provider, env);
-    
+    println!(
+        "🚀 Initializing terragrunt for {} (env: {})...",
+        provider, env
+    );
+
     let env_path = format!("envs/simulator/{}/{}", provider, env);
     if !Path::new(&env_path).exists() {
         anyhow::bail!("Environment path does not exist: {}", env_path);
@@ -826,7 +816,7 @@ pub fn init_terragrunt(provider: &str, env: &str, safe_mode: bool) -> Result<()>
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let error_msg = format!("Terragrunt init failed for {}: {}", provider, stderr.trim());
-        
+
         if safe_mode {
             eprintln!("⚠️ Warning (safe mode): {}", error_msg);
             Ok(())
@@ -836,38 +826,14 @@ pub fn init_terragrunt(provider: &str, env: &str, safe_mode: bool) -> Result<()>
     }
 }
 
-/// Plans terraform changes for a provider and environment
-/// 
-/// Runs `terragrunt run-all plan` to generate execution plans for all modules
-/// in the specified provider and environment. Supports environment variables
-/// and safe mode for CI environments.
-/// 
-/// # Arguments
-/// * `provider` - Provider name (aws, gcp, azure)
-/// * `env` - Environment name (typically "dev")
-/// * `vars` - Optional environment variables in "KEY=value" format
-/// * `safe_mode` - If true, continues execution despite plan failures
-/// 
-/// # Returns
-/// Result indicating success or failure (always success in safe mode)
-/// 
-/// # Errors
-/// - Environment path doesn't exist
-/// - Terragrunt plan failure (only in non-safe mode)
-/// 
-/// # Examples
-/// ```no_run
-/// use terragrunt_import_from_plan::utils::plan_terragrunt;
-/// 
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// plan_terragrunt("aws", "dev", None, false)?;
-/// plan_terragrunt("gcp", "dev", Some("PROJECT_ID=my-project"), true)?; // With vars and safe mode
-/// # Ok(())
-/// # }
-/// ```
-pub fn plan_terragrunt(provider: &str, env: &str, vars: Option<&str>, safe_mode: bool) -> Result<()> {
+pub fn plan_terragrunt(
+    provider: &str,
+    env: &str,
+    vars: Option<&str>,
+    safe_mode: bool,
+) -> Result<()> {
     println!("📋 Planning terragrunt for {} (env: {})...", provider, env);
-    
+
     let env_path = format!("envs/simulator/{}/{}", provider, env);
     if !Path::new(&env_path).exists() {
         anyhow::bail!("Environment path does not exist: {}", env_path);
@@ -890,7 +856,8 @@ pub fn plan_terragrunt(provider: &str, env: &str, vars: Option<&str>, safe_mode:
         }
     }
 
-    let output = cmd.output()
+    let output = cmd
+        .output()
         .with_context(|| format!("Failed to run terragrunt plan for {}", provider))?;
 
     // Extract plan summary from stdout and stderr
@@ -904,10 +871,15 @@ pub fn plan_terragrunt(provider: &str, env: &str, vars: Option<&str>, safe_mode:
 
     if output.status.success() {
         println!("✅ Terragrunt plan succeeded for {}", provider);
+
+        // Try to extract plan summary
+        if let Some(plan_line) = stdout.lines().find(|line| line.contains("Plan:")) {
+            println!("📊 {}", plan_line.trim());
+        }
         Ok(())
     } else {
         let error_msg = format!("Terragrunt plan failed for {}: {}", provider, stderr.trim());
-        
+
         if safe_mode {
             eprintln!("⚠️ Warning (safe mode): {}", error_msg);
             Ok(())
@@ -951,7 +923,7 @@ pub fn plan_terragrunt(provider: &str, env: &str, vars: Option<&str>, safe_mode:
 /// ```
 pub fn apply_terragrunt(provider: &str, env: &str, auto_approve: bool, safe_mode: bool) -> Result<()> {
     println!("🚀 Applying terragrunt for {} (env: {})...", provider, env);
-    
+
     let env_path = format!("envs/simulator/{}/{}", provider, env);
     if !Path::new(&env_path).exists() {
         anyhow::bail!("Environment path does not exist: {}", env_path);
@@ -983,8 +955,13 @@ pub fn apply_terragrunt(provider: &str, env: &str, auto_approve: bool, safe_mode
         println!("✅ Terragrunt apply succeeded for {}", provider);
         Ok(())
     } else {
-        let error_msg = format!("Terragrunt apply failed for {}: {}", provider, stderr.trim());
-        
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let error_msg = format!(
+            "Terragrunt apply failed for {}: {}",
+            provider,
+            stderr.trim()
+        );
+
         if safe_mode {
             eprintln!("⚠️ Warning (safe mode): {}", error_msg);
             Ok(())
@@ -994,41 +971,12 @@ pub fn apply_terragrunt(provider: &str, env: &str, auto_approve: bool, safe_mode
     }
 }
 
-/// Destroys terraform resources for a provider and environment
-/// 
-/// Runs `terragrunt run-all destroy` to destroy all resources managed by
-/// terraform for the specified provider and environment. This will permanently
-/// delete cloud resources.
-/// 
-/// # Arguments
-/// * `provider` - Provider name (aws, gcp, azure)
-/// * `env` - Environment name (typically "dev")
-/// * `auto_approve` - If true, skips confirmation prompt (default: false for safety)
-/// * `safe_mode` - If true, continues execution despite destroy failures
-/// 
-/// # Returns
-/// Result indicating success or failure (always success in safe mode)
-/// 
-/// # Errors
-/// - Environment path doesn't exist
-/// - Terragrunt destroy failure (only in non-safe mode)
-/// 
-/// # Warning
-/// This function permanently deletes real cloud resources. Use with extreme caution!
-/// 
-/// # Examples
-/// ```no_run
-/// use terragrunt_import_from_plan::utils::destroy_terragrunt;
-/// 
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// destroy_terragrunt("aws", "dev", false, false)?; // Requires confirmation
-/// destroy_terragrunt("gcp", "dev", true, true)?; // Auto-approve with safe mode
-/// # Ok(())
-/// # }
-/// ```
-pub fn destroy_terragrunt(provider: &str, env: &str, auto_approve: bool, safe_mode: bool) -> Result<()> {
-    println!("💥 Destroying terragrunt for {} (env: {})...", provider, env);
-    
+pub fn destroy_terragrunt(provider: &str, env: &str, safe_mode: bool) -> Result<()> {
+    println!(
+        "💥 Destroying terragrunt infrastructure for {} (env: {})...",
+        provider, env
+    );
+
     let env_path = format!("envs/simulator/{}/{}", provider, env);
     if !Path::new(&env_path).exists() {
         anyhow::bail!("Environment path does not exist: {}", env_path);
@@ -1060,8 +1008,13 @@ pub fn destroy_terragrunt(provider: &str, env: &str, auto_approve: bool, safe_mo
         println!("✅ Terragrunt destroy succeeded for {}", provider);
         Ok(())
     } else {
-        let error_msg = format!("Terragrunt destroy failed for {}: {}", provider, stderr.trim());
-        
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let error_msg = format!(
+            "Terragrunt destroy failed for {}: {}",
+            provider,
+            stderr.trim()
+        );
+
         if safe_mode {
             eprintln!("⚠️ Warning (safe mode): {}", error_msg);
             Ok(())
