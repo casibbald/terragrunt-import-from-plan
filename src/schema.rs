@@ -19,14 +19,14 @@
 pub mod manager;
 pub mod metadata;
 
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use serde_json::Value;
 use thiserror::Error;
 
 pub use manager::SchemaManager;
-pub use metadata::{AttributeMetadata, ResourceAttributeMap, AttributeMetadataError};
+pub use metadata::{AttributeMetadata, AttributeMetadataError, ResourceAttributeMap};
 
 /// Error types for provider schema operations
 /// 
@@ -39,15 +39,11 @@ pub enum SchemaError {
     CommandError(#[from] std::io::Error),
     /// Terragrunt command executed but returned non-zero exit status
     #[error("Terragrunt command failed with status {status}: stdout={stdout}, stderr={stderr}")]
-    TerragruntError { 
-        /// Exit status code from terragrunt command
-        status: i32, 
-        /// Standard output from the command
-        stdout: String, 
-        /// Standard error output from the command
-        stderr: String 
+    TerragruntError {
+        status: i32,
+        stdout: String,
+        stderr: String,
     },
-    /// Failed to parse the generated schema JSON
     #[error("Failed to parse schema JSON: {0}")]
     JsonError(#[from] serde_json::Error),
     /// Failed to write schema file to disk
@@ -109,8 +105,13 @@ pub fn write_provider_schema(dir: &Path) -> Result<(), SchemaError> {
 
     // Write the schema to the expected file
     let schema_path = dir.join(".terragrunt-provider-schema.json");
-    fs::write(&schema_path, &output.stdout)
-        .map_err(|e| SchemaError::WriteError(format!("Failed to write to {}: {}", schema_path.display(), e)))?;
+    fs::write(&schema_path, &output.stdout).map_err(|e| {
+        SchemaError::WriteError(format!(
+            "Failed to write to {}: {}",
+            schema_path.display(),
+            e
+        ))
+    })?;
 
     Ok(())
-} 
+}
